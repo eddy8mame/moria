@@ -20,7 +20,7 @@ interface PlantMetrics {
 }
 
 // Add this helper function above your loops
-const parseOptionalInt = (val: any): number | null => {
+const parseOptionalInt = (val: string): number | null => {
   if (val === undefined || val === null) return null;
   if (typeof val === "string" && val.trim() === "") return null;
   const parsed = parseInt(val, 10);
@@ -49,7 +49,7 @@ async function ingestEIA() {
     throw new Error('Could not find a sheet named explicitly "Plant".');
   }
   // Default sheet_to_json behavior uses Row 1 as headers
-  const plantsRaw = xlsx.utils.sheet_to_json<any>(plantSheet, { range: 1 });
+  const plantsRaw = xlsx.utils.sheet_to_json(plantSheet, { range: 1 });
 
   // 2. Extract & Transform: Parse Generator lifecycle sheets
   console.log("Parsing Generator Workbook lifecycle sheets...");
@@ -69,7 +69,7 @@ async function ingestEIA() {
       continue;
     }
 
-    const gensRaw = xlsx.utils.sheet_to_json<any>(sheet, { range: 1 });
+    const gensRaw = xlsx.utils.sheet_to_json(sheet, { range: 1 });
     console.log(`Processing ${gensRaw.length} rows from sheet: ${name}`);
 
     for (const gen of gensRaw) {
