@@ -6,7 +6,11 @@ set -euo pipefail
 # Run from project root: ./scripts/generate-tiles.sh
 # ===========================================================================
 
-DB="postgresql://dev_user:dev_password@localhost:5432/moria_db"
+set -a
+source "$(dirname "$0")/../.env"
+set +a
+
+DB="postgresql://${PG_USER}:${PG_PASSWORD}@${DB_HOST}:${DB_PORT}/${PG_DB}"
 OUT_DIR="public/tiles"
 TMP_DIR="data/tmp-geojson"
 

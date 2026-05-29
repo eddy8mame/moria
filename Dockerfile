@@ -1,37 +1,35 @@
-# --- Stage 1: Dependency Resolution ---
-FROM node:26-alpine AS deps
+# --- Stage 1: Setup Base ---
+FROM node:24-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable pnpm
+
+# --- Stage 2: Resolve Dependencies --- 
+FROM base as deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package manifests
-COPY package.json pnpm-lock.yaml* package-lock.json* yarn.lock* ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install dependencies based on your lockfile
-RUN \
-  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-# --- Stage 2: Production Compiler ---
-FROM node:26-alpine AS builder
+# --- Stage 3: Compile production build ---
+FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js collects anonymous telemetry data during builds. Disable it here:
+# Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN \
-  if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  elif [ -f yarn.lock ]; then yarn build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
 
-# --- Stage 3: Runner Engine ---
-FROM node:26-alpine AS runner
+ARG NEXT_PUBLIC_MAPTILER_KEY
+ENV NEXT_PUBLIC_MAPTILER_KEY=${NEXT_PUBLIC_MAPTILER_KEY}
+RUN pnpm build
+
+# --- Stage 4: Runner Engine ---
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -47,6 +45,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
+
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"

@@ -1,5 +1,9 @@
 .git
 .next
+.env
+.env.local
 node_modules
-data/
+data
 .DS_Store
+public/tiles
+docker-compose.dev.yml

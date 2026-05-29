@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 interface MapLegendProps {
     activeInfo: string | null;
     toggleInfo: (panel: string) => void;
@@ -34,7 +32,8 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                     backdropFilter: 'blur(4px)',
                     borderRadius: '8px',
                     padding: '16px',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                    boxShadow:
+                        '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
                 }}
             >
                 <div
@@ -45,7 +44,9 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                         marginBottom: activeInfo === 'water' ? '4px' : '8px',
                     }}
                 >
-                    <div style={{ fontWeight: 900, fontSize: '13px' }}>Water Stress</div>
+                    <div style={{ fontWeight: 900, fontSize: '13px' }}>
+                        Water Stress
+                    </div>
                     <svg
                         onClick={() => toggleInfo('water')}
                         width="14"
@@ -58,7 +59,8 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                         strokeLinejoin="round"
                         style={{
                             cursor: 'pointer',
-                            color: activeInfo === 'water' ? '#0f172a' : '#64748b',
+                            color:
+                                activeInfo === 'water' ? '#0f172a' : '#64748b',
                         }}
                     >
                         <circle cx="12" cy="12" r="10"></circle>
@@ -78,8 +80,9 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                             borderRadius: '4px',
                         }}
                     >
-                        Ratio of total water demand to available renewable supply. 
-                        Higher values indicate greater competition among users.
+                        Ratio of total water demand to available renewable
+                        supply. Higher values indicate greater competition among
+                        users.
                         <div style={{ marginTop: '4px' }}>
                             <a
                                 href="https://www.wri.org/data/aqueduct-global-maps-40-data"
@@ -101,7 +104,8 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                     style={{
                         height: '10px',
                         borderRadius: '2px',
-                        background: 'linear-gradient(to right, #ffff99 0%, #ffe600 25%, #ff9902 50%, #ff1800 75%, #990000 100%)',
+                        background:
+                            'linear-gradient(to right, #ffff99 0%, #ffe600 25%, #ff9902 50%, #ff1800 75%, #990000 100%)',
                         marginBottom: '4px',
                     }}
                 />
@@ -131,13 +135,49 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                     <span>(20–40%)</span>
                     <span>(&gt;80%)</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '2px', background: '#808080', opacity: 0.35, flexShrink: 0 }} />
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                    }}
+                >
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '2px',
+                                background: '#808080',
+                                opacity: 0.35,
+                                flexShrink: 0,
+                            }}
+                        />
                         <span>Arid and low water use</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '2px', background: '#4e4e4e', opacity: 0.35, flexShrink: 0 }} />
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '2px',
+                                background: '#4e4e4e',
+                                opacity: 0.35,
+                                flexShrink: 0,
+                            }}
+                        />
                         <span>No data</span>
                     </div>
                 </div>
@@ -150,7 +190,8 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                     backdropFilter: 'blur(4px)',
                     borderRadius: '8px',
                     padding: '16px',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                    boxShadow:
+                        '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
                 }}
             >
                 <div
@@ -161,7 +202,9 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                         marginBottom: activeInfo === 'data' ? '4px' : '8px',
                     }}
                 >
-                    <div style={{ fontWeight: 900, fontSize: '13px' }}>Data Centers</div>
+                    <div style={{ fontWeight: 900, fontSize: '13px' }}>
+                        Data Centers
+                    </div>
                     <svg
                         onClick={() => toggleInfo('data')}
                         width="14"
@@ -174,7 +217,8 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                         strokeLinejoin="round"
                         style={{
                             cursor: 'pointer',
-                            color: activeInfo === 'data' ? '#0f172a' : '#64748b',
+                            color:
+                                activeInfo === 'data' ? '#0f172a' : '#64748b',
                         }}
                     >
                         <circle cx="12" cy="12" r="10"></circle>
@@ -194,21 +238,71 @@ export default function MapLegend({ activeInfo, toggleInfo }: MapLegendProps) {
                             borderRadius: '4px',
                         }}
                     >
-                        Map displays operational and proposed data center facilities. Circle size indicates power capacity where known.
+                        Map displays operational and proposed data center
+                        facilities. Circle size indicates power capacity where
+                        known.
                     </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#4f46e5', border: '1px solid #fff' }} />
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                    }}
+                >
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: '#4f46e5',
+                                border: '1px solid #fff',
+                            }}
+                        />
                         <span>Operating</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#818cf8', border: '1px solid #fff' }} />
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: '#818cf8',
+                                border: '1px solid #fff',
+                            }}
+                        />
                         <span>In Development</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#c7d2fe', border: '1px solid #fff' }} />
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                        }}
+                    >
+                        <span
+                            style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: '#c7d2fe',
+                                border: '1px solid #fff',
+                            }}
+                        />
                         <span>Proposed</span>
                     </div>
                 </div>

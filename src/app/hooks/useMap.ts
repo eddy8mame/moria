@@ -91,7 +91,7 @@ export function useMap() {
                 layers: ['power-plants-circle'],
             });
 
-            const uniqueCenters = new Map<string, any>();
+            const uniqueCenters = new Map<string, maplibregl.GeoJSONFeature['properties']>();
             renderedCenters.forEach((f) => {
                 const id = f.properties.facility_id ?? f.properties.facility_name;
                 if (id && !uniqueCenters.has(id)) {
@@ -99,7 +99,7 @@ export function useMap() {
                 }
             });
 
-            const uniquePlants = new Map<string, any>();
+            const uniquePlants = new Map<string, maplibregl.GeoJSONFeature['properties']>();
             renderedPlants.forEach((f) => {
                 const id = f.properties.plant_code ?? f.properties.plant_name;
                 if (id && !uniquePlants.has(id)) {

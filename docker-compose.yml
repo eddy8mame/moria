@@ -1,69 +1,75 @@
-version: "3.8"
-
 services:
-  # --- The Spatial Database Layer ---
-  db:
-    image: postgis/postgis:16-3.4
-    container_name: moria
-    restart: always
-    environment:
-      POSTGRES_USER: moria_admin
-      POSTGRES_PASSWORD: production_secure_password_replace_me
-      POSTGRES_DB: moria_db
-    shm_size: 2gb
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    command: >
-      postgres 
-      -c shared_buffers=4GB 
-      -c work_mem=64MB 
-      -c maintenance_work_mem=1GB 
-      -c max_connections=100
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U moria_admin -d moria_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - moria-production-net
+    # --- The Spatial Database Layer ---
+    db:
+        image: postgis/postgis:16-3.4
+        container_name: moria
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${PG_USER}
+            POSTGRES_PASSWORD: ${PG_PASSWORD}
+            POSTGRES_DB: ${PG_DB}
+        shm_size: 4gb
+        ports:
+            - '127.0.0.1:${DB_PORT}:${DB_PORT}'
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+            - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+        command: >
+            postgres 
+            -c shared_buffers=4GB 
+            -c work_mem=64MB 
+            -c maintenance_work_mem=1GB 
+            -c max_connections=100
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U ${PG_USER} -d ${PG_DB}']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - moria-net
 
-  # --- The Next.js App Router Layer ---
-  frontend:
-    container_name: moria-nextjs-frontend
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - DATABASE_URL=postgresql://moria_admin:production_secure_password_replace_me@db:5432/moria_db
-      - NODE_ENV=production
-    ports:
-      - "3000:3000"
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - moria-production-net
-    restart: always
+    # --- The Next.js App Router Layer ---
+    frontend:
+        container_name: moria-frontend
+        restart: unless-stopped
+        build:
+            context: .
+            dockerfile: Dockerfile
+            args:
+                - NEXT_PUBLIC_MAPTILER_KEY=${NEXT_PUBLIC_MAPTILER_KEY}
+        environment:
+            - DATABASE_URL=postgresql://${PG_USER}:${PG_PASSWORD}@${DB_HOST}:${DB_PORT}/${PG_DB}
+            - NODE_ENV=production
+        ports:
+            - '3000:3000'
+        volumes:
+            - ./public/tiles:/app/public/tiles:ro
+        depends_on:
+            db:
+                condition: service_healthy
+        networks:
+            - moria-net
 
-  # --- Secure Administration Tooling ---
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: pgadmin
-    restart: always
-    ports:
-      - "127.0.0.1:8080:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: production_admin_password_replace_me
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - moria-production-net
+    # --- Secure Administration Tooling ---
+    pgadmin:
+        image: dpage/pgadmin4:latest
+        container_name: pgadmin
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:8080:80'
+        environment:
+            PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+            PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+        depends_on:
+            db:
+                condition: service_healthy
+        networks:
+            - moria-net
 
 volumes:
-  pgdata:
+    pgdata:
 
 networks:
-  moria-production-net:
-    driver: bridge
+    moria-net:
+        name: ${DOCKER_NETWORK_NAME}
+        driver: bridge

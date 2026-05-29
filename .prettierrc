@@ -4,7 +4,7 @@
     "tabWidth": 4,
     "semi": true,
     "singleQuote": true,
-    "plugins": ["@trivago/prettier-plugin-sort-imports"],
+    "plugins": ["@trivago/prettier-plugin-sort-imports", "prettier-plugin-sh"],
     "importOrder": ["^@core/(.*)$", "^@server/(.*)$", "^@ui/(.*)$", "^[./]"],
     "importOrderSeparation": true,
     "importOrderSortSpecifiers": true
