@@ -1,15 +1,35 @@
 'use client';
 
 import maplibregl from 'maplibre-gl';
+import type { FilterSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import { useEffect, useRef, useState } from 'react';
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-const STYLE_URL = `https://api.maptiler.com/maps/dataviz-light/style.json?key=${MAPTILER_KEY}`;
+const STYLE_URL = `https://api.maptiler.com/maps/dataviz-v4/style.json?key=${MAPTILER_KEY}`;
 
 const protocol = new Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
+
+export interface ViewportMetrics {
+    dataCenterCount: number;
+    dataCenterMw: number;
+    powerPlantCount: number;
+    powerPlantMw: number;
+}
+
+export interface ActiveLayers {
+    water: boolean;
+    power: boolean;
+    data: boolean;
+}
+
+type FilterExpression =
+    | string
+    | number
+    | FilterSpecification
+    | FilterExpression[];
 
 // EIA fuel type codes for tooltip display
 const EIA_FUEL_DICTIONARY: Record<string, string> = {
@@ -49,13 +69,6 @@ const EIA_FUEL_DICTIONARY: Record<string, string> = {
     H2: 'Hydrogen',
 };
 
-export interface ViewportMetrics {
-    dataCenterCount: number;
-    dataCenterMw: number;
-    powerPlantCount: number;
-    powerPlantMw: number;
-}
-
 export function useMap() {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
@@ -65,6 +78,21 @@ export function useMap() {
         powerPlantCount: 0,
         powerPlantMw: 0,
     });
+
+    const [activeLayers, setActiveLayers] = useState<ActiveLayers>({
+        water: true,
+        power: true,
+        data: true,
+    });
+
+    const [filters, setFilters] = useState({
+        status: 'all',
+        minCapacity: 0,
+    });
+
+    const toggleLayer = (layer: keyof typeof activeLayers) => {
+        setActiveLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
+    };
 
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
@@ -91,15 +119,24 @@ export function useMap() {
                 layers: ['power-plants-circle'],
             });
 
-            const uniqueCenters = new Map<string, maplibregl.GeoJSONFeature['properties']>();
+            const uniqueCenters = new Map<
+                string,
+                maplibregl.GeoJSONFeature['properties']
+            >();
+
             renderedCenters.forEach((f) => {
-                const id = f.properties.facility_id ?? f.properties.facility_name;
+                const id =
+                    f.properties.facility_id ?? f.properties.facility_name;
                 if (id && !uniqueCenters.has(id)) {
                     uniqueCenters.set(id, f.properties);
                 }
             });
 
-            const uniquePlants = new Map<string, maplibregl.GeoJSONFeature['properties']>();
+            const uniquePlants = new Map<
+                string,
+                maplibregl.GeoJSONFeature['properties']
+            >();
+            
             renderedPlants.forEach((f) => {
                 const id = f.properties.plant_code ?? f.properties.plant_name;
                 if (id && !uniquePlants.has(id)) {
@@ -129,7 +166,7 @@ export function useMap() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
         map.on('load', () => {
-             // map.addSource("counties", {
+            // map.addSource("counties", {
             //   type: "vector",
             //   url: "pmtiles:///tiles/counties.pmtiles",
             // });
@@ -171,13 +208,20 @@ export function useMap() {
                 paint: {
                     'fill-color': [
                         'case',
-                        ['==', ['get', 'bws_cat'], 4], '#990000',
-                        ['==', ['get', 'bws_cat'], 3], '#ff1800',
-                        ['==', ['get', 'bws_cat'], 2], '#ff9902',
-                        ['==', ['get', 'bws_cat'], 1], '#ffe600',
-                        ['==', ['get', 'bws_cat'], 0], '#ffff99',
-                        ['==', ['get', 'bws_cat'], -1], '#808080',
-                        ['==', ['get', 'bws_cat'], -9999], '#4e4e4e',
+                        ['==', ['get', 'bws_cat'], 4],
+                        '#990000',
+                        ['==', ['get', 'bws_cat'], 3],
+                        '#ff1800',
+                        ['==', ['get', 'bws_cat'], 2],
+                        '#ff9902',
+                        ['==', ['get', 'bws_cat'], 1],
+                        '#ffe600',
+                        ['==', ['get', 'bws_cat'], 0],
+                        '#ffff99',
+                        ['==', ['get', 'bws_cat'], -1],
+                        '#808080',
+                        ['==', ['get', 'bws_cat'], -9999],
+                        '#4e4e4e',
                         '#4e4e4e',
                     ],
                     'fill-opacity': 0.35,
@@ -196,35 +240,84 @@ export function useMap() {
                 'source-layer': 'power-plants',
                 paint: {
                     'circle-radius': [
-                        'interpolate', ['linear'], ['get', 'nameplate_capacity_mw'],
-                        0, 2, 500, 6, 2000, 12, 10000, 20,
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'nameplate_capacity_mw'],
+                        0,
+                        2,
+                        500,
+                        6,
+                        2000,
+                        12,
+                        10000,
+                        20,
                     ],
                     'circle-color': [
-                        'match', ['get', 'primary_fuel'],
-                        ['LFG', 'WDS', 'OBG', 'BLQ', 'MSW', 'AB', 'OBL', 'OBS', 'WDL'], '#2d6a4f',
-                        ['BIT', 'SUB', 'LIG', 'WC', 'SGC', 'RC'], '#495057',
-                        ['NG', 'OG', 'BFG'], '#e76f51',
-                        ['WAT'], '#219ebc',
-                        ['NUC'], '#7b2d8e',
-                        ['DFO', 'JF', 'KER', 'PC', 'RFO', 'WO'], '#774936',
-                        ['SUN'], '#f4a261',
-                        ['MWH'], '#0077b6',
-                        ['WND'], '#48cae4',
+                        'match',
+                        ['get', 'primary_fuel'],
+                        [
+                            'LFG',
+                            'WDS',
+                            'OBG',
+                            'BLQ',
+                            'MSW',
+                            'AB',
+                            'OBL',
+                            'OBS',
+                            'WDL',
+                        ],
+                        '#2d6a4f',
+                        ['BIT', 'SUB', 'LIG', 'WC', 'SGC', 'RC'],
+                        '#495057',
+                        ['NG', 'OG', 'BFG'],
+                        '#e76f51',
+                        ['WAT'],
+                        '#219ebc',
+                        ['NUC'],
+                        '#7b2d8e',
+                        ['DFO', 'JF', 'KER', 'PC', 'RFO', 'WO'],
+                        '#774936',
+                        ['SUN'],
+                        '#f4a261',
+                        ['MWH'],
+                        '#0077b6',
+                        ['WND'],
+                        '#48cae4',
                         '#adb5bd',
                     ],
                     'circle-opacity': 1.0,
                     'circle-stroke-width': 0.5,
                     'circle-stroke-color': [
-                        'match', ['get', 'primary_fuel'],
-                        ['LFG', 'WDS', 'OBG', 'BLQ', 'MSW', 'AB', 'OBL', 'OBS', 'WDL'], '#1b402f',
-                        ['BIT', 'SUB', 'LIG', 'WC', 'SGC', 'RC'], '#2c3135',
-                        ['NG', 'OG', 'BFG'], '#ba5941',
-                        ['WAT'], '#1a7e96',
-                        ['NUC'], '#561f63',
-                        ['DFO', 'JF', 'KER', 'PC', 'RFO', 'WO'], '#4d2f23',
-                        ['SUN'], '#c3824e',
-                        ['MWH'], '#005582',
-                        ['WND'], '#32a1b6',
+                        'match',
+                        ['get', 'primary_fuel'],
+                        [
+                            'LFG',
+                            'WDS',
+                            'OBG',
+                            'BLQ',
+                            'MSW',
+                            'AB',
+                            'OBL',
+                            'OBS',
+                            'WDL',
+                        ],
+                        '#1b402f',
+                        ['BIT', 'SUB', 'LIG', 'WC', 'SGC', 'RC'],
+                        '#2c3135',
+                        ['NG', 'OG', 'BFG'],
+                        '#ba5941',
+                        ['WAT'],
+                        '#1a7e96',
+                        ['NUC'],
+                        '#561f63',
+                        ['DFO', 'JF', 'KER', 'PC', 'RFO', 'WO'],
+                        '#4d2f23',
+                        ['SUN'],
+                        '#c3824e',
+                        ['MWH'],
+                        '#005582',
+                        ['WND'],
+                        '#32a1b6',
                         '#797f85',
                     ],
                 },
@@ -243,27 +336,48 @@ export function useMap() {
                 'source-layer': 'data-centers',
                 paint: {
                     'circle-radius': [
-                        'interpolate', ['linear'], ['zoom'],
-                        3, 3, 8, 7, 12, 12,
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        3,
+                        3,
+                        8,
+                        7,
+                        12,
+                        12,
                     ],
                     'circle-color': [
-                        'match', ['get', 'status'],
-                        'Expanding', '#312e81',
-                        'Operating', '#4f46e5',
-                        'Approved/Permitted/Under construction', '#818cf8',
-                        'Proposed', '#c7d2fe',
-                        'Suspended', '#d4d4d8',
-                        'Cancelled', '#71717a',
+                        'match',
+                        ['get', 'status'],
+                        'Expanding',
+                        '#312e81',
+                        'Operating',
+                        '#4f46e5',
+                        'Approved/Permitted/Under construction',
+                        '#818cf8',
+                        'Proposed',
+                        '#c7d2fe',
+                        'Suspended',
+                        '#d4d4d8',
+                        'Cancelled',
+                        '#71717a',
                         '#94a3b8',
                     ],
                     'circle-opacity': [
-                        'match', ['get', 'status'],
-                        'Expanding', 1.0,
-                        'Operating', 0.95,
-                        'Approved/Permitted/Under construction', 0.8,
-                        'Proposed', 0.6,
-                        'Suspended', 0.5,
-                        'Cancelled', 0.3,
+                        'match',
+                        ['get', 'status'],
+                        'Expanding',
+                        1.0,
+                        'Operating',
+                        0.95,
+                        'Approved/Permitted/Under construction',
+                        0.8,
+                        'Proposed',
+                        0.6,
+                        'Suspended',
+                        0.5,
+                        'Cancelled',
+                        0.3,
                         0.5,
                     ],
                     'circle-stroke-width': 2.0,
@@ -292,7 +406,9 @@ export function useMap() {
                 : 'Unknown capacity';
 
             const rawFuel = p.primary_fuel;
-            const fuelDisplay = rawFuel ? (EIA_FUEL_DICTIONARY[rawFuel] ?? rawFuel) : 'Unknown fuel';
+            const fuelDisplay = rawFuel
+                ? (EIA_FUEL_DICTIONARY[rawFuel] ?? rawFuel)
+                : 'Unknown fuel';
 
             popup
                 .setLngLat(coords)
@@ -323,8 +439,12 @@ export function useMap() {
                 status = 'In Development';
             }
 
-            const mw = p.capacity_mw != null ? `${Number(p.capacity_mw).toLocaleString()} MW` : null;
-            const rank = p.size_rank != null ? `Size Rank: ${p.size_rank}` : null;
+            const mw =
+                p.capacity_mw != null
+                    ? `${Number(p.capacity_mw).toLocaleString()} MW`
+                    : null;
+            const rank =
+                p.size_rank != null ? `Size Rank: ${p.size_rank}` : null;
             const details = [status, mw, rank].filter(Boolean).join(' · ');
 
             popup
@@ -349,5 +469,71 @@ export function useMap() {
         };
     }, []);
 
-    return { containerRef, viewportMetrics };
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded()) return;
+
+        const setVisibility = (layerId: string, isVisible: boolean) => {
+            if (map.getLayer(layerId)) {
+                map.setLayoutProperty(
+                    layerId,
+                    'visibility',
+                    isVisible ? 'visible' : 'none'
+                );
+            }
+        };
+
+        // Update Water Basins
+        setVisibility('water-basins-fill', activeLayers.water);
+
+        // Update Data Centers
+        setVisibility('data-centers-circle', activeLayers.data);
+
+        // Update Power Plants
+        setVisibility('power-plants-circle', activeLayers.power);
+    }, [activeLayers]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded()) return;
+
+        const filterConditions: FilterExpression[] = ['all'];
+
+        if (filters.status !== 'All') {
+            const rawStatus =
+                filters.status === 'In Development'
+                    ? 'Approved/Permitted/Under construction'
+                    : filters.status;
+
+            filterConditions.push(['==', ['get', 'status'], rawStatus]);
+        }
+
+        if (filters.minCapacity > 0) {
+            filterConditions.push([
+                '>=',
+                ['to-number', ['get', 'capacity_mw']],
+                filters.minCapacity,
+            ]);
+        }
+
+        if (map.getLayer('data-centers-circle')) {
+            map.setFilter(
+                'data-centers-circle',
+                filterConditions.length > 1
+                    ? (filterConditions as unknown as FilterSpecification)
+                    : null
+            );
+        }
+
+        map.fire('idle');
+    }, [filters]);
+
+    return {
+        containerRef,
+        viewportMetrics,
+        activeLayers,
+        toggleLayer,
+        filters,
+        setFilters,
+    };
 }

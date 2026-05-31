@@ -6,7 +6,7 @@ import MapLegend from './Map/MapLegend';
 import MapDashboard from './Map/MapDashboard';
 
 export default function MapComponent() {
-    const { containerRef, viewportMetrics } = useMap();
+    const { containerRef, viewportMetrics, activeLayers, toggleLayer, filters, setFilters } = useMap();
     const [activeInfo, setActiveInfo] = useState<string | null>(null);
 
     const toggleInfo = (panel: string): void => {
@@ -32,7 +32,7 @@ export default function MapComponent() {
             <MapDashboard metrics={viewportMetrics} />
 
             {/* Interactive Legend */}
-            <MapLegend activeInfo={activeInfo} toggleInfo={toggleInfo} />
+            <MapLegend activeInfo={activeInfo} toggleInfo={toggleInfo} activeLayers={activeLayers} toggleLayer={toggleLayer} filters={filters} setFilters={setFilters} />
         </div>
     );
 }
