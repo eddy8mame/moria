@@ -3,15 +3,13 @@
 import { useState } from 'react';
 import { useMap } from '@/app/hooks/useMap';
 import MapLegend from './Map/MapLegend';
-import MapDashboard from './Map/MapDashboard';
 
 export default function MapComponent() {
-    const { containerRef, viewportMetrics, activeLayers, toggleLayer, filters, setFilters } = useMap();
+    const { containerRef, activeLayers, toggleLayer, filters, setFilters } = useMap();
     const [activeInfo, setActiveInfo] = useState<string | null>(null);
 
-    const toggleInfo = (panel: string): void => {
-        setActiveInfo(activeInfo === panel ? null : panel);
-    };
+    const toggleInfo = (panel: string) =>
+        setActiveInfo((prev) => (prev === panel ? null : panel));
 
     return (
         <div
@@ -27,12 +25,14 @@ export default function MapComponent() {
             }}
         >
             <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-
-            {/* Narrative Dashboard Panel */}
-            <MapDashboard metrics={viewportMetrics} />
-
-            {/* Interactive Legend */}
-            <MapLegend activeInfo={activeInfo} toggleInfo={toggleInfo} activeLayers={activeLayers} toggleLayer={toggleLayer} filters={filters} setFilters={setFilters} />
+            <MapLegend
+                activeInfo={activeInfo}
+                toggleInfo={toggleInfo}
+                activeLayers={activeLayers}
+                toggleLayer={toggleLayer}
+                filters={filters}
+                setFilters={setFilters}
+            />
         </div>
     );
 }
