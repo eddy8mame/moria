@@ -30,6 +30,26 @@ function buildSentence(
     const opCount = hasWater ? filteredDcCounts.operating : dcTotals.operating;
     const plCount = hasWater ? filteredDcCounts.planned : dcTotals.planned;
 
+    // Percentage — only shown when a water filter is active
+    let pct = '';
+    if (hasWater) {
+        let numerator: number;
+        let denominator: number;
+        if (status === null) {
+            numerator = filteredDcCounts.operating + filteredDcCounts.planned;
+            denominator = dcTotals.operating + dcTotals.planned;
+        } else if (status === 'Operating') {
+            numerator = filteredDcCounts.operating;
+            denominator = dcTotals.operating;
+        } else {
+            numerator = filteredDcCounts.planned;
+            denominator = dcTotals.planned;
+        }
+        if (denominator > 0) {
+            pct = ` (${Math.round((numerator / denominator) * 100)}%)`;
+        }
+    }
+
     // Location phrase
     let location = 'across the United States';
     if (hasWater) {
@@ -45,13 +65,13 @@ function buildSentence(
     if (status === null) {
         return (
             `There are ${opCount.toLocaleString()} operating and ` +
-            `${plCount.toLocaleString()} planned data centers ${location}.`
+            `${plCount.toLocaleString()} planned data centers${pct} ${location}.`
         );
     }
     if (status === 'Operating') {
-        return `There are ${opCount.toLocaleString()} operating data centers ${location}.`;
+        return `There are ${opCount.toLocaleString()} operating data centers${pct} ${location}.`;
     }
-    return `There are ${plCount.toLocaleString()} planned data centers ${location}.`;
+    return `There are ${plCount.toLocaleString()} planned data centers${pct} ${location}.`;
 }
 
 function SkeletonPill() {
@@ -116,7 +136,7 @@ export default function FilterSentence({
                         padding: '7px 16px',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: '#0f172a',
+                        color: '#333333',
                         lineHeight: 1.45,
                         letterSpacing: '0.01em',
                         whiteSpace: 'nowrap',

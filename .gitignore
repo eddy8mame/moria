@@ -43,8 +43,15 @@ yarn-error.log*
 next-env.d.ts
 
 # system files
-.DS_Storedata/
+.DS_Store
 
+# vercel deployment
+data/
+db/
+scripts/
+.dockerignore
+.env.example
+dockerfile
+docker-cpmpose.yml
 docker-compose.dev.yml
-data/raw/
-public/tiles
+

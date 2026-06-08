@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { ActiveLayers, Filters } from '@/app/hooks/useMap';
 
 interface MapLegendProps {
@@ -14,6 +15,7 @@ interface MapLegendProps {
 const WATER_STRESS: {
     label: string;
     sublabel: string;
+    tooltip: string;
     color: string;
     textColor: string;
     bwsCat: number;
@@ -23,6 +25,7 @@ const WATER_STRESS: {
     {
         label: 'Ext. High',
         sublabel: '>80%',
+        tooltip: 'Extremely High Water Stress',
         color: '#8B1A1A',
         textColor: '#fff',
         bwsCat: 4,
@@ -32,6 +35,7 @@ const WATER_STRESS: {
     {
         label: 'High',
         sublabel: '40–80%',
+        tooltip: 'High Water Stress',
         color: '#D93320',
         textColor: '#fff',
         bwsCat: 3,
@@ -41,6 +45,7 @@ const WATER_STRESS: {
     {
         label: 'Med-High',
         sublabel: '20–40%',
+        tooltip: 'Medium-High Water Stress',
         color: '#D97F20',
         textColor: '#fff',
         bwsCat: 2,
@@ -50,6 +55,7 @@ const WATER_STRESS: {
     {
         label: 'Low-Med',
         sublabel: '10–20%',
+        tooltip: 'Low-Medium Water Stress',
         color: '#D4C030',
         textColor: '#fff',
         bwsCat: 1,
@@ -59,6 +65,7 @@ const WATER_STRESS: {
     {
         label: 'Low',
         sublabel: '<10%',
+        tooltip: 'Low Water Stress',
         color: '#C8C47A',
         textColor: '#fff',
         bwsCat: 0,
@@ -71,6 +78,7 @@ const WATER_STRESS: {
 const WATER_ARID = {
     label: 'Arid',
     sublabel: 'Low use',
+    tooltip: 'Arid & Low-Use Areas',
     color: '#808080',
     textColor: '#fff',
     bwsCat: -1,
@@ -81,6 +89,7 @@ const WATER_ARID = {
 const WATER_SPECIAL: {
     label: string;
     sublabel: string;
+    tooltip: string;
     color: string;
     textColor: string;
     bwsCat: number;
@@ -89,6 +98,7 @@ const WATER_SPECIAL: {
     {
         label: 'ND',
         sublabel: '',
+        tooltip: 'No Water Stress Data',
         color: '#4e4e4e',
         textColor: '#fff',
         bwsCat: -9999,
@@ -102,17 +112,18 @@ const SELECTABLE_CATS = [...WATER_STRESS.map((w) => w.bwsCat), -1];
 
 const DC_STATUSES: {
     label: 'Operating' | 'Planned';
+    tooltip: string;
     color: string;
     textColor: string;
 }[] = [
-    { label: 'Operating', color: '#019603', textColor: '#fff' },
-    { label: 'Planned', color: '#4f46e5', textColor: '#fff' },
+    { label: 'Operating', tooltip: 'Operating & Expanding Facilities', color: '#019603', textColor: '#fff' },
+    { label: 'Planned', tooltip: 'Proposed & Approved Facilities', color: '#4f46e5', textColor: '#fff' },
 ];
 
 const CTRL: React.CSSProperties = {
     background: 'transparent',
     borderRadius: '4px',
-    overflow: 'hidden',
+    overflow: 'visible',
     color: '#0f172a',
     fontSize: '11px',
     lineHeight: '1.4',
@@ -141,6 +152,7 @@ function InfoIcon({ active }: { active: boolean }) {
 function Chip({
     label,
     sublabel,
+    tooltip,
     color,
     textColor,
     active,
@@ -152,6 +164,7 @@ function Chip({
 }: {
     label: string;
     sublabel?: string;
+    tooltip?: string;
     color: string;
     textColor: string;
     active: boolean;
@@ -161,6 +174,8 @@ function Chip({
     last?: boolean;
     onClick: () => void;
 }) {
+    const [hovered, setHovered] = useState(false);
+
     const shadows = active
         ? 'inset 0 2px 5px rgba(0,0,0,0.35)'
         : [
@@ -169,67 +184,104 @@ function Chip({
           ].join(', ');
 
     return (
-        <button
-            onClick={clickable ? onClick : undefined}
-            style={{
-                background: color,
-                color: textColor,
-                padding: sublabel ? '4px 6px 3px' : '5px 6px',
-                fontSize: '10px',
-                fontWeight: 600,
-                lineHeight: 1.2,
-                textAlign: 'center',
-                borderRadius: first
-                    ? '20px 0 0 20px'
-                    : last
-                      ? '0 20px 20px 0'
-                      : '0',
-                border: 'none',
-                flex: 1,
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: clickable ? 'pointer' : 'default',
-                boxShadow: shadows,
-                opacity: clickable && dimmed ? 0.35 : 1,
-                transition: clickable
-                    ? 'opacity 0.15s, box-shadow 0.15s, transform 0.12s cubic-bezier(.34,1.56,.64,1)'
-                    : 'opacity 0.15s',
-            }}
-            onMouseEnter={
-                clickable
-                    ? (e) => (e.currentTarget.style.transform = 'scale(1.06)')
-                    : undefined
-            }
-            onMouseLeave={
-                clickable
-                    ? (e) => (e.currentTarget.style.transform = 'scale(1)')
-                    : undefined
-            }
-            onMouseDown={
-                clickable
-                    ? (e) => (e.currentTarget.style.transform = 'scale(0.94)')
-                    : undefined
-            }
-            onMouseUp={
-                clickable
-                    ? (e) => (e.currentTarget.style.transform = 'scale(1)')
-                    : undefined
-            }
-        >
-            <span
+        <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
+            {hovered && tooltip && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 7px)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: 'rgba(255, 255, 255, 100)',
+                        color: '#000',
+                        borderRadius: '6px',
+                        padding: '4px 9px',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        zIndex: 100,
+                        letterSpacing: '0.02em',
+                        lineHeight: 1.4,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                    }}
+                >
+                    {tooltip}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: 0,
+                            height: 0,
+                            borderLeft: '5px solid transparent',
+                            borderRight: '5px solid transparent',
+                            borderTop: '5px solid rgba(255, 255, 255, 100)',
+                        }}
+                    />
+                </div>
+            )}
+            <button
+                onClick={clickable ? onClick : undefined}
                 style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '100%',
+                    background: color,
+                    color: textColor,
+                    padding: sublabel ? '4px 6px 3px' : '5px 6px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    lineHeight: 1.2,
+                    textAlign: 'center',
+                    borderRadius: first
+                        ? '20px 0 0 20px'
+                        : last
+                          ? '0 20px 20px 0'
+                          : '0',
+                    border: 'none',
+                    flex: 1,
+                    minWidth: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: clickable ? 'pointer' : 'default',
+                    boxShadow: shadows,
+                    opacity: clickable && dimmed ? 0.95 : 1,
+                    transition: clickable
+                        ? 'opacity 0.15s, box-shadow 0.15s, transform 0.12s cubic-bezier(.34,1.56,.64,1)'
+                        : 'opacity 0.15s',
                 }}
+                onMouseEnter={(e) => {
+                    setHovered(true);
+                    if (clickable) e.currentTarget.style.transform = 'scale(1.06)';
+                }}
+                onMouseLeave={(e) => {
+                    setHovered(false);
+                    if (clickable) e.currentTarget.style.transform = 'scale(1)';
+                }}
+                onMouseDown={
+                    clickable
+                        ? (e) => (e.currentTarget.style.transform = 'scale(0.94)')
+                        : undefined
+                }
+                onMouseUp={
+                    clickable
+                        ? (e) => (e.currentTarget.style.transform = 'scale(1)')
+                        : undefined
+                }
             >
-                {label}
-            </span>
-        </button>
+                <span
+                    style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                    }}
+                >
+                    {label}
+                </span>
+            </button>
+        </div>
     );
 }
 
@@ -241,6 +293,7 @@ function ChipRow<T extends string | number>({
     items: {
         label: string;
         sublabel?: string;
+        tooltip?: string;
         color: string;
         textColor: string;
         glowColor?: string;
@@ -266,6 +319,7 @@ function ChipRow<T extends string | number>({
                         key={String(item.value)}
                         label={item.label}
                         sublabel={item.sublabel}
+                        tooltip={item.tooltip}
                         color={item.color}
                         textColor={item.textColor}
                         active={isActive}
@@ -307,6 +361,7 @@ function MultiChipRow({
                         key={item.bwsCat}
                         label={item.label}
                         sublabel={item.sublabel}
+                        tooltip={item.tooltip}
                         color={item.color}
                         textColor={item.textColor}
                         active={isActive}

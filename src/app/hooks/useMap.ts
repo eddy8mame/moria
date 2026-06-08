@@ -35,6 +35,7 @@ export interface Filters {
 export function useMap() {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
+
     const [viewportMetrics, setViewportMetrics] = useState<ViewportMetrics>({
         dataCenterCount: 0,
         dataCenterMw: 0,
@@ -50,20 +51,25 @@ export function useMap() {
         waterCat: [],
     });
 
-    const [dcTotals, setDcTotals] = useState<DcTotals>({ operating: 0, planned: 0 });
+    const [dcTotals, setDcTotals] = useState<DcTotals>({
+        operating: 0,
+        planned: 0,
+    });
     const [dcTotalsReady, setDcTotalsReady] = useState(false);
-    const [filteredDcCounts, setFilteredDcCounts] = useState<DcTotals>({ operating: 0, planned: 0 });
+    const [filteredDcCounts, setFilteredDcCounts] = useState<DcTotals>({
+        operating: 0,
+        planned: 0,
+    });
     const [filteredDcCountsReady, setFilteredDcCountsReady] = useState(true);
 
-    // Always-current ref so idle callbacks can read the latest filters
     const filtersRef = useRef(filters);
-    filtersRef.current = filters;
 
     const toggleLayer = (layer: keyof ActiveLayers) =>
         setActiveLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
 
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
+        filtersRef.current = filters;
 
         const map = new maplibregl.Map({
             container: containerRef.current,
@@ -146,7 +152,7 @@ export function useMap() {
                             ['linear'],
                             ['zoom'],
                             5,
-                            0.8,
+                            1,
                             10,
                             0.7,
                             13,
@@ -177,11 +183,53 @@ export function useMap() {
                             ['linear'],
                             ['zoom'],
                             3,
-                            5,
+                            [
+                                'match',
+                                ['get', 'size_rank'],
+                                'Mega campus (>1,000 MW)',
+                                9.5, // 7.5 + 2
+                                'Hyperscale (100-999 MW)',
+                                7, // 5 + 2
+                                'Large (51-99 MW)',
+                                5.75, // 3.75 + 2
+                                'Medium (11-50 MW)',
+                                4.5, // 2.5 + 2
+                                'Small (0-10 MW)',
+                                3.5, // 1.5 + 2
+                                4.1, // 2.1 + 2
+                            ],
                             8,
-                            10,
+                            [
+                                'match',
+                                ['get', 'size_rank'],
+                                'Mega campus (>1,000 MW)',
+                                12, // 9 + 3
+                                'Hyperscale (100-999 MW)',
+                                9, // 6 + 3
+                                'Large (51-99 MW)',
+                                7.5, // 4.5 + 3
+                                'Medium (11-50 MW)',
+                                6, // 3 + 3
+                                'Small (0-10 MW)',
+                                4.8, // 1.8 + 3
+                                5.55, // 2.55 + 3
+                            ],
                             12,
-                            16,
+                            [
+                                'match',
+                                ['get', 'size_rank'],
+                                'Mega campus (>1,000 MW)',
+                                19, // 15 + 4
+                                'Hyperscale (100-999 MW)',
+                                14, // 10 + 4
+                                'Large (51-99 MW)',
+                                11.5, // 7.5 + 4
+                                'Medium (11-50 MW)',
+                                9, // 5 + 4
+                                'Small (0-10 MW)',
+                                7, // 3 + 4
+                                8.25, // 4.25 + 4
+                            ],
                         ],
                         'circle-color': [
                             'match',
@@ -207,7 +255,7 @@ export function useMap() {
                             1,
                             0,
                         ],
-                        'circle-blur': 0.95,
+                        'circle-blur': 1,
                     },
                 },
                 'Place labels'
@@ -225,11 +273,53 @@ export function useMap() {
                             ['linear'],
                             ['zoom'],
                             3,
-                            3,
+                            [
+                                'match',
+                                ['get', 'size_rank'],
+                                'Mega campus (>1,000 MW)',
+                                7.5,
+                                'Hyperscale (100-999 MW)',
+                                5,
+                                'Large (51-99 MW)',
+                                3.75,
+                                'Medium (11-50 MW)',
+                                2.5,
+                                'Small (0-10 MW)',
+                                1.5,
+                                2.1,
+                            ],
                             8,
-                            7,
+                            [
+                                'match',
+                                ['get', 'size_rank'],
+                                'Mega campus (>1,000 MW)',
+                                9,
+                                'Hyperscale (100-999 MW)',
+                                6,
+                                'Large (51-99 MW)',
+                                4.5,
+                                'Medium (11-50 MW)',
+                                3,
+                                'Small (0-10 MW)',
+                                1.8,
+                                2.55,
+                            ],
                             12,
-                            12,
+                            [
+                                'match',
+                                ['get', 'size_rank'],
+                                'Mega campus (>1,000 MW)',
+                                15,
+                                'Hyperscale (100-999 MW)',
+                                10,
+                                'Large (51-99 MW)',
+                                7.5,
+                                'Medium (11-50 MW)',
+                                5,
+                                'Small (0-10 MW)',
+                                3,
+                                4.25,
+                            ],
                         ],
                         'circle-color': [
                             'match',
@@ -287,6 +377,7 @@ export function useMap() {
             map.moveLayer('Building', 'data-centers-circle-shadow');
             map.moveLayer('Building top', 'data-centers-circle-shadow');
             map.moveLayer('Other border', 'data-centers-circle-shadow');
+            map.moveLayer('water-basins-fill', 'Railway tunnel');
 
             // Exclude Cancelled/Suspended from the start — don't rely on opacity
             const ACTIVE_STATUSES = [
@@ -361,8 +452,10 @@ export function useMap() {
                     ? `${Number(p.capacity_mw).toLocaleString()} MW`
                     : null;
             const rank =
-                p.size_rank != null ? `Size Rank: ${p.size_rank}` : null;
-            const details = [status, mw, rank].filter(Boolean).join(' · ');
+                p.size_rank != null && p.size_rank !== 'Unknown'
+                    ? String(p.size_rank).replace(/ \(.*\)$/, '') // strip MW range, e.g. "Hyperscale"
+                    : null;
+            const details = [status, rank, mw].filter(Boolean).join(' · ');
 
             popup
                 .setLngLat(coords)
@@ -490,7 +583,7 @@ export function useMap() {
                       ['linear'],
                       ['zoom'],
                       5,
-                      0.8,
+                      1,
                       10,
                       0.7,
                       13,
@@ -514,40 +607,70 @@ export function useMap() {
         setFilteredDcCountsReady(false);
 
         const compute = () => {
-            if (!map.getLayer('data-centers-circle') || !map.getLayer('water-basins-fill')) return;
+            if (
+                !map.getLayer('data-centers-circle') ||
+                !map.getLayer('water-basins-fill')
+            )
+                return;
 
-            const ACTIVE = ['Operating', 'Expanding', 'Proposed', 'Approved/Permitted/Under construction'];
-            const features = map.querySourceFeatures('data-centers', { sourceLayer: 'data-centers' });
+            const ACTIVE = [
+                'Operating',
+                'Expanding',
+                'Proposed',
+                'Approved/Permitted/Under construction',
+            ];
+            const features = map.querySourceFeatures('data-centers', {
+                sourceLayer: 'data-centers',
+            });
 
             // Deduplicate; store coords + status for both operating and planned
-            const unique = new Map<string, { coords: [number, number]; status: string }>();
-            features.forEach(feat => {
+            const unique = new Map<
+                string,
+                { coords: [number, number]; status: string }
+            >();
+            features.forEach((feat) => {
                 const status: string = feat.properties?.status ?? '';
                 if (!ACTIVE.includes(status)) return;
-                const id = String(feat.properties?.facility_id ?? feat.properties?.facility_name ?? '');
+                const id = String(
+                    feat.properties?.facility_id ??
+                        feat.properties?.facility_name ??
+                        ''
+                );
                 if (id && feat.geometry.type === 'Point' && !unique.has(id)) {
-                    unique.set(id, { coords: feat.geometry.coordinates as [number, number], status });
+                    unique.set(id, {
+                        coords: feat.geometry.coordinates as [number, number],
+                        status,
+                    });
                 }
             });
 
-            let op = 0, pl = 0;
+            let op = 0,
+                pl = 0;
             unique.forEach(({ coords, status }) => {
                 try {
                     const px = map.project(coords as maplibregl.LngLatLike);
-                    const hits = map.queryRenderedFeatures([px.x, px.y], { layers: ['water-basins-fill'] });
+                    const hits = map.queryRenderedFeatures([px.x, px.y], {
+                        layers: ['water-basins-fill'],
+                    });
                     if (hits.length > 0) {
                         if (['Operating', 'Expanding'].includes(status)) op++;
                         else pl++;
                     }
-                } catch { /* off-screen */ }
+                } catch {
+                    /* off-screen */
+                }
             });
             setFilteredDcCounts({ operating: op, planned: pl });
             setFilteredDcCountsReady(true);
         };
 
+        console.log(map.getStyle().layers.map((l) => l.id));
+
         // Wait for next idle so both the DC and water basin filters have rendered
         map.once('idle', compute);
-        return () => { map.off('idle', compute as Parameters<typeof map.off>[1]); };
+        return () => {
+            map.off('idle', compute as Parameters<typeof map.off>[1]);
+        };
     }, [filters.waterCat, filters.status]);
 
     return {
