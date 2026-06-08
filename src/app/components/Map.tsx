@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { useMap } from '@/app/hooks/useMap';
 import MapLegend from './Map/MapLegend';
+import FilterSentence from './Map/FilterSentence';
 
 export default function MapComponent() {
-    const { containerRef, activeLayers, toggleLayer, filters, setFilters } = useMap();
+    const { containerRef, activeLayers, toggleLayer, filters, setFilters, dcTotals, dcTotalsReady, filteredDcCounts, filteredDcCountsReady } = useMap();
     const [activeInfo, setActiveInfo] = useState<string | null>(null);
 
     const toggleInfo = (panel: string) =>
@@ -25,6 +26,13 @@ export default function MapComponent() {
             }}
         >
             <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+            <FilterSentence
+                filters={filters}
+                dcTotals={dcTotals}
+                dcTotalsReady={dcTotalsReady}
+                filteredDcCounts={filteredDcCounts}
+                filteredDcCountsReady={filteredDcCountsReady}
+            />
             <MapLegend
                 activeInfo={activeInfo}
                 toggleInfo={toggleInfo}

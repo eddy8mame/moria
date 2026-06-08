@@ -11,7 +11,6 @@ interface MapLegendProps {
     setFilters: React.Dispatch<React.SetStateAction<Filters>>;
 }
 
-// Clickable stress categories — bwsCat matches useMap.ts
 const WATER_STRESS: {
     label: string;
     sublabel: string;
@@ -19,6 +18,7 @@ const WATER_STRESS: {
     textColor: string;
     bwsCat: number;
     clickable: true;
+    opacity: 0.9;
 }[] = [
     {
         label: 'Ext. High',
@@ -27,6 +27,7 @@ const WATER_STRESS: {
         textColor: '#fff',
         bwsCat: 4,
         clickable: true,
+        opacity: 0.9,
     },
     {
         label: 'High',
@@ -35,6 +36,7 @@ const WATER_STRESS: {
         textColor: '#fff',
         bwsCat: 3,
         clickable: true,
+        opacity: 0.9,
     },
     {
         label: 'Med-High',
@@ -43,6 +45,7 @@ const WATER_STRESS: {
         textColor: '#fff',
         bwsCat: 2,
         clickable: true,
+        opacity: 0.9,
     },
     {
         label: 'Low-Med',
@@ -51,18 +54,30 @@ const WATER_STRESS: {
         textColor: '#fff',
         bwsCat: 1,
         clickable: true,
+        opacity: 0.9,
     },
     {
         label: 'Low',
         sublabel: '<10%',
         color: '#C8C47A',
-        textColor: '#0f172a',
+        textColor: '#fff',
         bwsCat: 0,
         clickable: true,
+        opacity: 0.9,
     },
 ];
 
-// Non-clickable — display only
+// Arid is now clickable — it filters the map when selected
+const WATER_ARID = {
+    label: 'Arid',
+    sublabel: 'Low use',
+    color: '#808080',
+    textColor: '#fff',
+    bwsCat: -1,
+    clickable: true as const,
+};
+
+// No Data stays non-clickable / always rendered
 const WATER_SPECIAL: {
     label: string;
     sublabel: string;
@@ -72,15 +87,7 @@ const WATER_SPECIAL: {
     clickable: false;
 }[] = [
     {
-        label: 'Arid',
-        sublabel: 'Low use',
-        color: '#808080',
-        textColor: '#fff',
-        bwsCat: -1,
-        clickable: false,
-    },
-    {
-        label: 'No Data',
+        label: 'ND',
         sublabel: '',
         color: '#4e4e4e',
         textColor: '#fff',
@@ -89,8 +96,9 @@ const WATER_SPECIAL: {
     },
 ];
 
-const ALL_WATER_CHIPS = [...WATER_STRESS, ...WATER_SPECIAL];
-const SELECTABLE_CATS = WATER_STRESS.map((w) => w.bwsCat);
+const ALL_WATER_CHIPS = [...WATER_STRESS, WATER_ARID, ...WATER_SPECIAL];
+// All selectable bwsCat values (stress levels 4→0 + Arid -1)
+const SELECTABLE_CATS = [...WATER_STRESS.map((w) => w.bwsCat), -1];
 
 const DC_STATUSES: {
     label: 'Operating' | 'Planned';
@@ -221,18 +229,10 @@ function Chip({
             >
                 {label}
             </span>
-            {/* {sublabel && (
-                <span
-                    style={{ fontSize: '8px', opacity: 0.8, fontWeight: 400 }}
-                >
-                    {sublabel}
-                </span>
-            )} */}
         </button>
     );
 }
 
-/** Single-select pill row */
 function ChipRow<T extends string | number>({
     items,
     selected,
@@ -253,6 +253,7 @@ function ChipRow<T extends string | number>({
         <div
             style={{
                 display: 'flex',
+                width: '100%',
                 borderRadius: '20px',
                 boxShadow:
                     '0 1px 3px rgba(0,0,0,0.2), inset 0 1px 3px rgba(0,0,0,0.15)',
@@ -280,8 +281,6 @@ function ChipRow<T extends string | number>({
     );
 }
 
-/** Multi-select pill row with optional non-clickable chips.
- *  Selecting all clickable chips reverts to "show all" (empty). */
 function MultiChipRow({
     items,
     selected,
@@ -350,10 +349,11 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
+                alignItems: 'flex-end',
             }}
         >
             {/* ── Data Centers ────────────────────────────── */}
-            <div style={{ ...CTRL, width: '200px' }}>
+            <div style={{ ...CTRL, minWidth: '200px' }}>
                 <div style={{ padding: '8px 8px' }}>
                     <ChipRow
                         items={DC_STATUSES.map((s) => ({
@@ -369,13 +369,16 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
             </div>
 
             {/* ── Water Basin Stress ──────────────────────── */}
-            <div style={{ ...CTRL, width: '360px' }}>
+            <div style={{ ...CTRL, minWidth: '460px' }}>
                 <div style={{ padding: '8px 8px' }}>
                     <MultiChipRow
                         items={ALL_WATER_CHIPS}
                         selected={filters.waterCat}
                         onSelect={(v) =>
-                            setFilters((prev) => ({ ...prev, waterCat: v }))
+                            setFilters((prev) => ({
+                                ...prev,
+                                waterCat: v,
+                            }))
                         }
                     />
                 </div>
