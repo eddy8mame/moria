@@ -149,20 +149,7 @@ function InfoIcon({ active }: { active: boolean }) {
     );
 }
 
-const BADGE_STYLE: React.CSSProperties = {
-    width: '32px',
-    height: '32px',
-    borderRadius: '8px',
-    background: 'rgba(255,255,255,0.96)',
-    boxShadow:
-        '0 1px 3px rgba(0,0,0,0.2), ' +
-        'inset 0 1px 0 rgba(255,255,255,0.9), ' +
-        'inset 0 -1px 0 rgba(0,0,0,0.08)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-};
+const PILL_SHADOW = '0 1px 3px rgba(0,0,0,0.2), inset 0 1px 3px rgba(0,0,0,0.15)';
 
 function ServerIcon() {
     return (
@@ -182,6 +169,52 @@ function DropIcon() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2L5.5 12.5a6.5 6.5 0 1013 0L12 2z" />
         </svg>
+    );
+}
+
+function LegendRow({
+    icon,
+    expanded,
+    onToggle,
+    children,
+}: {
+    icon: React.ReactNode;
+    expanded: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+}) {
+    const [badgeHovered, setBadgeHovered] = useState(false);
+    return (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+                onClick={onToggle}
+                onMouseEnter={() => setBadgeHovered(true)}
+                onMouseLeave={() => setBadgeHovered(false)}
+                style={{
+                    width: '38px',
+                    height: '38px',
+                    padding: 0,
+                    flexShrink: 0,
+                    background: badgeHovered ? '#e2e8f0' : '#f1f5f9',
+                    border: 'none',
+                    borderRadius: expanded ? '20px 0 0 20px' : '20px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: PILL_SHADOW,
+                    transition: 'background 0.15s, border-radius 0.2s',
+                    zIndex: 1,
+                }}
+            >
+                {icon}
+            </button>
+            {expanded && (
+                <div style={{ marginLeft: '-1px' }}>
+                    {children}
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -325,6 +358,7 @@ function ChipRow<T extends string | number>({
     items,
     selected,
     onSelect,
+    attached,
 }: {
     items: {
         label: string;
@@ -337,15 +371,15 @@ function ChipRow<T extends string | number>({
     }[];
     selected: T | null;
     onSelect: (value: T | null) => void;
+    attached?: boolean;
 }) {
     return (
         <div
             style={{
                 display: 'flex',
                 width: '100%',
-                borderRadius: '20px',
-                boxShadow:
-                    '0 1px 3px rgba(0,0,0,0.2), inset 0 1px 3px rgba(0,0,0,0.15)',
+                borderRadius: attached ? '0 20px 20px 0' : '20px',
+                boxShadow: PILL_SHADOW,
             }}
         >
             {items.map((item, i) => {
@@ -361,7 +395,7 @@ function ChipRow<T extends string | number>({
                         active={isActive}
                         dimmed={selected !== null && !isActive}
                         clickable
-                        first={i === 0}
+                        first={!attached && i === 0}
                         last={i === items.length - 1}
                         onClick={() => onSelect(isActive ? null : item.value)}
                     />
@@ -375,18 +409,19 @@ function MultiChipRow({
     items,
     selected,
     onSelect,
+    attached,
 }: {
     items: typeof ALL_WATER_CHIPS;
     selected: number[];
     onSelect: (values: number[]) => void;
+    attached?: boolean;
 }) {
     return (
-        <div style={{ display: 'flex', borderRadius: '20px' }}>
+        <div style={{ display: 'flex', borderRadius: attached ? '0 20px 20px 0' : '20px' }}>
             {items.map((item, i) => {
                 const isActive =
                     !item.clickable || selected.includes(item.bwsCat);
                 const anySelected = selected.length > 0;
-                // Non-clickable chips are never dimmed; clickable ones dim when not active
                 const isDimmed =
                     item.clickable &&
                     anySelected &&
@@ -403,7 +438,7 @@ function MultiChipRow({
                         active={isActive}
                         dimmed={isDimmed}
                         clickable={item.clickable}
-                        first={i === 0}
+                        first={!attached && i === 0}
                         last={i === items.length - 1}
                         onClick={() => {
                             if (!item.clickable) return;
@@ -415,7 +450,6 @@ function MultiChipRow({
                             } else {
                                 next = [...selected, item.bwsCat];
                             }
-                            // All selectable categories chosen → revert to show-all
                             const allChosen = SELECTABLE_CATS.every((c) =>
                                 next.includes(c)
                             );
@@ -429,6 +463,9 @@ function MultiChipRow({
 }
 
 export default function MapLegend({ filters, setFilters }: MapLegendProps) {
+    const [dcExpanded, setDcExpanded] = useState(true);
+    const [waterExpanded, setWaterExpanded] = useState(true);
+
     return (
         <div
             style={{
@@ -444,46 +481,40 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
             }}
         >
             {/* ── Data Centers ────────────────────────────── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={BADGE_STYLE}>
-                    <ServerIcon />
+            <LegendRow
+                icon={<ServerIcon />}
+                expanded={dcExpanded}
+                onToggle={() => setDcExpanded((p) => !p)}
+            >
+                <div style={{ padding: '8px 8px 8px 0' }}>
+                    <ChipRow
+                        attached
+                        items={DC_STATUSES.map((s) => ({ ...s, value: s.label }))}
+                        selected={filters.status}
+                        onSelect={(v) =>
+                            setFilters((prev) => ({ ...prev, status: v }))
+                        }
+                    />
                 </div>
-                <div style={{ ...CTRL, minWidth: '200px' }}>
-                    <div style={{ padding: '8px 8px' }}>
-                        <ChipRow
-                            items={DC_STATUSES.map((s) => ({
-                                ...s,
-                                value: s.label,
-                            }))}
-                            selected={filters.status}
-                            onSelect={(v) =>
-                                setFilters((prev) => ({ ...prev, status: v }))
-                            }
-                        />
-                    </div>
-                </div>
-            </div>
+            </LegendRow>
 
             {/* ── Water Basin Stress ──────────────────────── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={BADGE_STYLE}>
-                    <DropIcon />
+            <LegendRow
+                icon={<DropIcon />}
+                expanded={waterExpanded}
+                onToggle={() => setWaterExpanded((p) => !p)}
+            >
+                <div style={{ padding: '8px 8px 8px 0' }}>
+                    <MultiChipRow
+                        attached
+                        items={ALL_WATER_CHIPS}
+                        selected={filters.waterCat}
+                        onSelect={(v) =>
+                            setFilters((prev) => ({ ...prev, waterCat: v }))
+                        }
+                    />
                 </div>
-                <div style={{ ...CTRL, minWidth: '460px' }}>
-                    <div style={{ padding: '8px 8px' }}>
-                        <MultiChipRow
-                            items={ALL_WATER_CHIPS}
-                            selected={filters.waterCat}
-                            onSelect={(v) =>
-                                setFilters((prev) => ({
-                                    ...prev,
-                                    waterCat: v,
-                                }))
-                            }
-                        />
-                    </div>
-                </div>
-            </div>
+            </LegendRow>
         </div>
     );
 }
