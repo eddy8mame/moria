@@ -152,13 +152,13 @@ export function useMap() {
                             ['linear'],
                             ['zoom'],
                             5,
-                            1,
-                            10,
-                            0.7,
+                            0.75, // strong at regional view — water stress is the story
+                            8,
+                            0.65, // slight reduction at state level
+                            11,
+                            0.5, // backing off as city detail emerges
                             13,
-                            0.65,
-                            15,
-                            0.45,
+                            0.35, // light enough to see streets and roads beneath
                         ],
                         'fill-opacity-transition': { duration: 600, delay: 0 },
                     },
@@ -241,7 +241,7 @@ export function useMap() {
                                 'Proposed',
                             ],
                             '#4f46e5',
-                            '#019603',
+                            '#000000',
                         ],
                         'circle-opacity': [
                             'match',
@@ -377,7 +377,6 @@ export function useMap() {
             map.moveLayer('Building', 'data-centers-circle-shadow');
             map.moveLayer('Building top', 'data-centers-circle-shadow');
             map.moveLayer('Other border', 'data-centers-circle-shadow');
-            map.moveLayer('water-basins-fill', 'Railway tunnel');
 
             // Exclude Cancelled/Suspended from the start — don't rely on opacity
             const ACTIVE_STATUSES = [
@@ -394,7 +393,6 @@ export function useMap() {
             map.setFilter('data-centers-circle', baseFilter);
             map.setFilter('data-centers-circle-shadow', baseFilter);
 
-            map.on('idle', calculateVisibleMetrics);
             map.on('moveend', calculateVisibleMetrics);
 
             // Compute US-wide DC totals once after first idle (all tiles loaded)
@@ -473,6 +471,25 @@ export function useMap() {
             popup.remove();
         });
 
+        let roadsAboveWater = false;
+
+        map.on('zoom', () => {
+            const zoom = map.getZoom();
+
+            if (zoom >= 10 && !roadsAboveWater) {
+                map.moveLayer(
+                    'Road network outline',
+                    'data-centers-circle-shadow'
+                );
+                map.moveLayer('Road network', 'data-centers-circle-shadow');
+                roadsAboveWater = true;
+            } else if (zoom < 10 && roadsAboveWater) {
+                map.moveLayer('Road network outline', 'Pier');
+                map.moveLayer('Road network', 'Pier');
+                roadsAboveWater = false;
+            }
+        });
+
         return () => {
             map.remove();
             mapRef.current = null;
@@ -540,7 +557,6 @@ export function useMap() {
 
         map.setFilter('data-centers-circle', filter);
         map.setFilter('data-centers-circle-shadow', filter);
-        map.fire('idle');
     }, [filters.status]);
 
     // Water basin category filter + opacity — handled together so both always stay in sync
@@ -562,36 +578,6 @@ export function useMap() {
                 : null;
         map.setFilter('water-basins-fill', filter);
 
-        // Full opacity when filtering; zoom-based expression when showing all
-        const opacity =
-            selected.length > 0
-                ? [
-                      'interpolate',
-                      ['linear'],
-                      ['zoom'],
-                      5,
-                      1,
-                      10,
-                      0.7,
-                      13,
-                      0.65,
-                      15,
-                      0.45,
-                  ]
-                : [
-                      'interpolate',
-                      ['linear'],
-                      ['zoom'],
-                      5,
-                      1,
-                      10,
-                      0.7,
-                      13,
-                      0.65,
-                      15,
-                      0.45,
-                  ];
-        map.setPaintProperty('water-basins-fill', 'fill-opacity', opacity);
     }, [filters.waterCat]);
 
     // Spatial DC count — split by operating/planned, for DCs inside selected water basins
@@ -663,8 +649,6 @@ export function useMap() {
             setFilteredDcCounts({ operating: op, planned: pl });
             setFilteredDcCountsReady(true);
         };
-
-        console.log(map.getStyle().layers.map((l) => l.id));
 
         // Wait for next idle so both the DC and water basin filters have rendered
         map.once('idle', compute);
