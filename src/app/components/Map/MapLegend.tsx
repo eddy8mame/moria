@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { ActiveLayers, Filters } from '@/app/hooks/useMap';
 
 interface MapLegendProps {
@@ -74,7 +74,6 @@ const WATER_STRESS: {
     },
 ];
 
-// Arid is now clickable — it filters the map when selected
 const WATER_ARID = {
     label: 'Arid',
     sublabel: 'Low use',
@@ -174,18 +173,70 @@ function DropIcon() {
 
 function LegendRow({
     icon,
+    tooltip,
     expanded,
     onToggle,
     children,
 }: {
     icon: React.ReactNode;
+    tooltip: string;
     expanded: boolean;
     onToggle: () => void;
     children: React.ReactNode;
 }) {
     const [badgeHovered, setBadgeHovered] = useState(false);
+    const badgeTooltipRef = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        if (!badgeHovered || !badgeTooltipRef.current) return;
+        const el = badgeTooltipRef.current;
+        el.style.left = '50%';
+        el.style.right = 'auto';
+        el.style.transform = 'translateX(-50%)';
+        const rect = el.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 8) {
+            el.style.left = 'auto';
+            el.style.right = '0';
+            el.style.transform = 'none';
+        }
+    }, [badgeHovered]);
+
     return (
         <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+                {badgeHovered && (
+                    <div ref={badgeTooltipRef} style={{
+                        position: 'absolute',
+                        bottom: 'calc(100% + 7px)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: 'rgba(15, 23, 42, 0.88)',
+                        color: '#fff',
+                        borderRadius: '6px',
+                        padding: '4px 9px',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none',
+                        zIndex: 100,
+                        letterSpacing: '0.02em',
+                        lineHeight: 1.4,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                    }}>
+                        {tooltip}
+                        <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: 0,
+                            height: 0,
+                            borderLeft: '5px solid transparent',
+                            borderRight: '5px solid transparent',
+                            borderTop: '5px solid rgba(15, 23, 42, 0.88)',
+                        }} />
+                    </div>
+                )}
             <button
                 onClick={onToggle}
                 onMouseEnter={() => setBadgeHovered(true)}
@@ -209,6 +260,7 @@ function LegendRow({
             >
                 {icon}
             </button>
+            </div>
             {expanded && (
                 <div style={{ marginLeft: '-1px' }}>
                     {children}
@@ -244,6 +296,21 @@ function Chip({
     onClick: () => void;
 }) {
     const [hovered, setHovered] = useState(false);
+    const tooltipRef = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        if (!hovered || !tooltipRef.current) return;
+        const el = tooltipRef.current;
+        el.style.left = '50%';
+        el.style.right = 'auto';
+        el.style.transform = 'translateX(-50%)';
+        const rect = el.getBoundingClientRect();
+        if (rect.right > window.innerWidth - 8) {
+            el.style.left = 'auto';
+            el.style.right = '0';
+            el.style.transform = 'none';
+        }
+    }, [hovered]);
 
     const shadows = active
         ? 'inset 0 2px 5px rgba(0,0,0,0.35)'
@@ -256,6 +323,7 @@ function Chip({
         <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
             {hovered && tooltip && (
                 <div
+                    ref={tooltipRef}
                     style={{
                         position: 'absolute',
                         bottom: 'calc(100% + 7px)',
@@ -296,7 +364,8 @@ function Chip({
                 style={{
                     background: color,
                     color: textColor,
-                    padding: sublabel ? '4px 6px 3px' : '5px 6px',
+                    padding: '0 8px',
+                minHeight: '38px',
                     fontSize: '10px',
                     fontWeight: 600,
                     lineHeight: 1.2,
@@ -462,6 +531,16 @@ function MultiChipRow({
     );
 }
 
+function InfoBadgeIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="11" x2="12" y2="17" />
+            <circle cx="12" cy="7.5" r="0.75" fill="#475569" stroke="none" />
+        </svg>
+    );
+}
+
 export default function MapLegend({ filters, setFilters }: MapLegendProps) {
     const [dcExpanded, setDcExpanded] = useState(true);
     const [waterExpanded, setWaterExpanded] = useState(true);
@@ -470,7 +549,7 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
         <div
             style={{
                 position: 'absolute',
-                bottom: '2rem',
+                bottom: '3rem',
                 right: '1rem',
                 pointerEvents: 'auto',
                 zIndex: 1,
@@ -483,10 +562,11 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
             {/* ── Data Centers ────────────────────────────── */}
             <LegendRow
                 icon={<ServerIcon />}
+                tooltip="Data Center Status"
                 expanded={dcExpanded}
                 onToggle={() => setDcExpanded((p) => !p)}
             >
-                <div style={{ padding: '8px 8px 8px 0' }}>
+                <div style={{ padding: '0 8px 0 0' }}>
                     <ChipRow
                         attached
                         items={DC_STATUSES.map((s) => ({ ...s, value: s.label }))}
@@ -501,10 +581,11 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
             {/* ── Water Basin Stress ──────────────────────── */}
             <LegendRow
                 icon={<DropIcon />}
+                tooltip="Water Basin Stress"
                 expanded={waterExpanded}
                 onToggle={() => setWaterExpanded((p) => !p)}
             >
-                <div style={{ padding: '8px 8px 8px 0' }}>
+                <div style={{ padding: '0 8px 0 0' }}>
                     <MultiChipRow
                         attached
                         items={ALL_WATER_CHIPS}
