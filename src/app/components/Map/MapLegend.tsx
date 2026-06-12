@@ -149,6 +149,42 @@ function InfoIcon({ active }: { active: boolean }) {
     );
 }
 
+const BADGE_STYLE: React.CSSProperties = {
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.96)',
+    boxShadow:
+        '0 1px 3px rgba(0,0,0,0.2), ' +
+        'inset 0 1px 0 rgba(255,255,255,0.9), ' +
+        'inset 0 -1px 0 rgba(0,0,0,0.08)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+};
+
+function ServerIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="5" rx="1.5" />
+            <rect x="2" y="10" width="20" height="5" rx="1.5" />
+            <rect x="2" y="17" width="20" height="5" rx="1.5" />
+            <circle cx="18.5" cy="5.5" r="0.75" fill="#475569" stroke="none" />
+            <circle cx="18.5" cy="12.5" r="0.75" fill="#475569" stroke="none" />
+            <circle cx="18.5" cy="19.5" r="0.75" fill="#475569" stroke="none" />
+        </svg>
+    );
+}
+
+function DropIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L5.5 12.5a6.5 6.5 0 1013 0L12 2z" />
+        </svg>
+    );
+}
+
 function Chip({
     label,
     sublabel,
@@ -408,34 +444,44 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
             }}
         >
             {/* ── Data Centers ────────────────────────────── */}
-            <div style={{ ...CTRL, minWidth: '200px' }}>
-                <div style={{ padding: '8px 8px' }}>
-                    <ChipRow
-                        items={DC_STATUSES.map((s) => ({
-                            ...s,
-                            value: s.label,
-                        }))}
-                        selected={filters.status}
-                        onSelect={(v) =>
-                            setFilters((prev) => ({ ...prev, status: v }))
-                        }
-                    />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={BADGE_STYLE}>
+                    <ServerIcon />
+                </div>
+                <div style={{ ...CTRL, minWidth: '200px' }}>
+                    <div style={{ padding: '8px 8px' }}>
+                        <ChipRow
+                            items={DC_STATUSES.map((s) => ({
+                                ...s,
+                                value: s.label,
+                            }))}
+                            selected={filters.status}
+                            onSelect={(v) =>
+                                setFilters((prev) => ({ ...prev, status: v }))
+                            }
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* ── Water Basin Stress ──────────────────────── */}
-            <div style={{ ...CTRL, minWidth: '460px' }}>
-                <div style={{ padding: '8px 8px' }}>
-                    <MultiChipRow
-                        items={ALL_WATER_CHIPS}
-                        selected={filters.waterCat}
-                        onSelect={(v) =>
-                            setFilters((prev) => ({
-                                ...prev,
-                                waterCat: v,
-                            }))
-                        }
-                    />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={BADGE_STYLE}>
+                    <DropIcon />
+                </div>
+                <div style={{ ...CTRL, minWidth: '460px' }}>
+                    <div style={{ padding: '8px 8px' }}>
+                        <MultiChipRow
+                            items={ALL_WATER_CHIPS}
+                            selected={filters.waterCat}
+                            onSelect={(v) =>
+                                setFilters((prev) => ({
+                                    ...prev,
+                                    waterCat: v,
+                                }))
+                            }
+                        />
+                    </div>
                 </div>
             </div>
         </div>
