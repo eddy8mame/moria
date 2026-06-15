@@ -9,8 +9,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export interface DcMetrics {
     operating: number;
     planned: number;
-    pct: number | null;  // set only when: water filter active + national zoom (≤5)
-    isViewport: boolean; // true when zoom > 5
+    pctOp: number | null;  // viewport op / national op in same water cats; null outside viewport+water mode
+    pctPl: number | null;  // viewport pl / national pl in same water cats; null outside viewport+water mode
+    isViewport: boolean;   // true when zoom > 5
 }
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
@@ -66,7 +67,8 @@ export function useMap() {
     const [dcMetrics, setDcMetrics] = useState<DcMetrics>({
         operating: 0,
         planned: 0,
-        pct: null,
+        pctOp: null,
+        pctPl: null,
         isViewport: false,
     });
     const [dcMetricsReady, setDcMetricsReady] = useState(false);
@@ -86,22 +88,27 @@ export function useMap() {
         const isViewport = zoom > 5 && bounds !== null;
         const hasWater = waterCat.length > 0;
 
-        let operating = 0,
-            planned = 0;
-        let totalOp = 0,
-            totalPl = 0;
+        let operating = 0, planned = 0;
+        // National counts within selected water cats — denominators for viewport pct
+        let natOpInCats = 0, natPlInCats = 0;
 
         for (const f of features) {
             const s = f.properties.status;
+            const bwsCat = f.properties.bws_cat ?? -9999;
+            const isOp = OPERATING_STATUSES.includes(s);
+            const isPl = PLANNED_STATUSES.includes(s);
 
-            // National totals — used for pct denominator
-            if (OPERATING_STATUSES.includes(s)) totalOp++;
-            else if (PLANNED_STATUSES.includes(s)) totalPl++;
+            if (!isOp && !isPl) continue;
 
-            // Status filter
-            if (status === 'Operating' && !OPERATING_STATUSES.includes(s)) continue;
-            if (status === 'Planned' && !PLANNED_STATUSES.includes(s)) continue;
-            if (status === null && !ACTIVE_STATUSES.includes(s)) continue;
+            // Accumulate national-in-cats denominators (no status filter, no viewport filter)
+            if (hasWater && isViewport && waterCat.includes(bwsCat)) {
+                if (isOp) natOpInCats++;
+                else natPlInCats++;
+            }
+
+            // Status filter for main counts
+            if (status === 'Operating' && !isOp) continue;
+            if (status === 'Planned' && !isPl) continue;
 
             // Viewport filter
             if (isViewport) {
@@ -110,31 +117,22 @@ export function useMap() {
             }
 
             // Water filter — treat null bws_cat as -9999 (no data)
-            const bwsCat = f.properties.bws_cat ?? -9999;
             if (hasWater && !waterCat.includes(bwsCat)) continue;
 
-            if (OPERATING_STATUSES.includes(s)) operating++;
+            if (isOp) operating++;
             else planned++;
         }
 
-        // Percentage: national mode + water filter active only
-        let pct: number | null = null;
-        if (hasWater && !isViewport) {
-            let num: number, den: number;
-            if (status === null) {
-                num = operating + planned;
-                den = totalOp + totalPl;
-            } else if (status === 'Operating') {
-                num = operating;
-                den = totalOp;
-            } else {
-                num = planned;
-                den = totalPl;
-            }
-            pct = den > 0 ? Math.round((num / den) * 100) : null;
+        // Percentages: viewport + water filter only
+        // pct = viewport count / national count in same selected water cats
+        let pctOp: number | null = null;
+        let pctPl: number | null = null;
+        if (hasWater && isViewport) {
+            pctOp = natOpInCats > 0 ? Math.round((operating / natOpInCats) * 100) : null;
+            pctPl = natPlInCats > 0 ? Math.round((planned / natPlInCats) * 100) : null;
         }
 
-        setDcMetrics({ operating, planned, pct, isViewport });
+        setDcMetrics({ operating, planned, pctOp, pctPl, isViewport });
     }, []);
 
     // Stable ref so map event handlers always call the latest version

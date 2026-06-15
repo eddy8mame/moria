@@ -46,7 +46,7 @@ next-env.d.ts
 .DS_Store
 
 # vercel deployment
-data/
+/data/
 db/
 scripts/
 .dockerignore
