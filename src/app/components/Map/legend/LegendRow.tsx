@@ -8,12 +8,14 @@ export function LegendRow({
     tooltip,
     expanded,
     onToggle,
+    infoBadge,
     children,
 }: {
     icon: React.ReactNode;
     tooltip: string;
     expanded: boolean;
     onToggle: () => void;
+    infoBadge?: React.ReactNode;
     children: React.ReactNode;
 }) {
     const [badgeHovered, setBadgeHovered] = useState(false);
@@ -69,6 +71,7 @@ export function LegendRow({
                         }} />
                     </div>
                 )}
+                {infoBadge}
                 <button
                     onClick={onToggle}
                     onMouseEnter={() => setBadgeHovered(true)}
