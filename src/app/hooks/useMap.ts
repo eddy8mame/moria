@@ -4,11 +4,13 @@ import maplibregl from 'maplibre-gl';
 import type { FilterSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-export interface DcTotals {
+export interface DcMetrics {
     operating: number;
     planned: number;
+    pct: number | null;  // set only when: water filter active + national zoom (≤5)
+    isViewport: boolean; // true when zoom > 5
 }
 
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
@@ -32,6 +34,16 @@ export interface Filters {
     waterCat: number[]; // empty = show all
 }
 
+// Status helpers
+const OPERATING_STATUSES = ['Operating', 'Expanding'];
+const PLANNED_STATUSES = ['Proposed', 'Approved/Permitted/Under construction'];
+const ACTIVE_STATUSES = [...OPERATING_STATUSES, ...PLANNED_STATUSES];
+
+interface DcFeature {
+    properties: { status: string; bws_cat: number | null };
+    geometry: { type: 'Point'; coordinates: [number, number] };
+}
+
 export function useMap() {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
@@ -51,18 +63,82 @@ export function useMap() {
         waterCat: [],
     });
 
-    const [dcTotals, setDcTotals] = useState<DcTotals>({
+    const [dcMetrics, setDcMetrics] = useState<DcMetrics>({
         operating: 0,
         planned: 0,
+        pct: null,
+        isViewport: false,
     });
-    const [dcTotalsReady, setDcTotalsReady] = useState(false);
-    const [filteredDcCounts, setFilteredDcCounts] = useState<DcTotals>({
-        operating: 0,
-        planned: 0,
-    });
-    const [filteredDcCountsReady, setFilteredDcCountsReady] = useState(true);
+    const [dcMetricsReady, setDcMetricsReady] = useState(false);
 
+    const allFeaturesRef = useRef<DcFeature[]>([]);
+    const boundsRef = useRef<maplibregl.LngLatBounds | null>(null);
+    const zoomRef = useRef(4); // matches map constructor initial zoom
     const filtersRef = useRef(filters);
+
+    const computeMetrics = useCallback(() => {
+        const features = allFeaturesRef.current;
+        if (features.length === 0) return;
+
+        const { status, waterCat } = filtersRef.current;
+        const zoom = zoomRef.current;
+        const bounds = boundsRef.current;
+        const isViewport = zoom > 5 && bounds !== null;
+        const hasWater = waterCat.length > 0;
+
+        let operating = 0,
+            planned = 0;
+        let totalOp = 0,
+            totalPl = 0;
+
+        for (const f of features) {
+            const s = f.properties.status;
+
+            // National totals — used for pct denominator
+            if (OPERATING_STATUSES.includes(s)) totalOp++;
+            else if (PLANNED_STATUSES.includes(s)) totalPl++;
+
+            // Status filter
+            if (status === 'Operating' && !OPERATING_STATUSES.includes(s)) continue;
+            if (status === 'Planned' && !PLANNED_STATUSES.includes(s)) continue;
+            if (status === null && !ACTIVE_STATUSES.includes(s)) continue;
+
+            // Viewport filter
+            if (isViewport) {
+                const [lng, lat] = f.geometry.coordinates;
+                if (!bounds!.contains([lng, lat] as maplibregl.LngLatLike)) continue;
+            }
+
+            // Water filter — treat null bws_cat as -9999 (no data)
+            const bwsCat = f.properties.bws_cat ?? -9999;
+            if (hasWater && !waterCat.includes(bwsCat)) continue;
+
+            if (OPERATING_STATUSES.includes(s)) operating++;
+            else planned++;
+        }
+
+        // Percentage: national mode + water filter active only
+        let pct: number | null = null;
+        if (hasWater && !isViewport) {
+            let num: number, den: number;
+            if (status === null) {
+                num = operating + planned;
+                den = totalOp + totalPl;
+            } else if (status === 'Operating') {
+                num = operating;
+                den = totalOp;
+            } else {
+                num = planned;
+                den = totalPl;
+            }
+            pct = den > 0 ? Math.round((num / den) * 100) : null;
+        }
+
+        setDcMetrics({ operating, planned, pct, isViewport });
+    }, []);
+
+    // Stable ref so map event handlers always call the latest version
+    const computeRef = useRef(computeMetrics);
 
     const toggleLayer = (layer: keyof ActiveLayers) =>
         setActiveLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
@@ -70,6 +146,15 @@ export function useMap() {
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
         filtersRef.current = filters;
+
+        // Fetch GeoJSON — single source of truth for all metrics
+        fetch('/data/data-centers.geojson')
+            .then((r) => r.json())
+            .then((data: { features: DcFeature[] }) => {
+                allFeaturesRef.current = data.features;
+                computeRef.current();
+                setDcMetricsReady(true);
+            });
 
         const map = new maplibregl.Map({
             container: containerRef.current,
@@ -117,6 +202,9 @@ export function useMap() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
         map.on('load', () => {
+            // Capture initial bounds for viewport-mode metrics
+            boundsRef.current = map.getBounds();
+
             map.addSource('water-basins', {
                 type: 'vector',
                 url: 'pmtiles:///tiles/water-basins.pmtiles',
@@ -152,13 +240,13 @@ export function useMap() {
                             ['linear'],
                             ['zoom'],
                             5,
-                            1,
-                            10,
-                            0.7,
-                            13,
+                            0.75,
+                            8,
                             0.65,
-                            15,
-                            0.45,
+                            11,
+                            0.5,
+                            13,
+                            0.35,
                         ],
                         'fill-opacity-transition': { duration: 600, delay: 0 },
                     },
@@ -187,48 +275,48 @@ export function useMap() {
                                 'match',
                                 ['get', 'size_rank'],
                                 'Mega campus (>1,000 MW)',
-                                9.5, // 7.5 + 2
+                                9.5,
                                 'Hyperscale (100-999 MW)',
-                                7, // 5 + 2
+                                7,
                                 'Large (51-99 MW)',
-                                5.75, // 3.75 + 2
+                                5.75,
                                 'Medium (11-50 MW)',
-                                4.5, // 2.5 + 2
+                                4.5,
                                 'Small (0-10 MW)',
-                                3.5, // 1.5 + 2
-                                4.1, // 2.1 + 2
+                                3.5,
+                                4.1,
                             ],
                             8,
                             [
                                 'match',
                                 ['get', 'size_rank'],
                                 'Mega campus (>1,000 MW)',
-                                12, // 9 + 3
+                                12,
                                 'Hyperscale (100-999 MW)',
-                                9, // 6 + 3
+                                9,
                                 'Large (51-99 MW)',
-                                7.5, // 4.5 + 3
+                                7.5,
                                 'Medium (11-50 MW)',
-                                6, // 3 + 3
+                                6,
                                 'Small (0-10 MW)',
-                                4.8, // 1.8 + 3
-                                5.55, // 2.55 + 3
+                                4.8,
+                                5.55,
                             ],
                             12,
                             [
                                 'match',
                                 ['get', 'size_rank'],
                                 'Mega campus (>1,000 MW)',
-                                19, // 15 + 4
+                                19,
                                 'Hyperscale (100-999 MW)',
-                                14, // 10 + 4
+                                14,
                                 'Large (51-99 MW)',
-                                11.5, // 7.5 + 4
+                                11.5,
                                 'Medium (11-50 MW)',
-                                9, // 5 + 4
+                                9,
                                 'Small (0-10 MW)',
-                                7, // 3 + 4
-                                8.25, // 4.25 + 4
+                                7,
+                                8.25,
                             ],
                         ],
                         'circle-color': [
@@ -241,7 +329,7 @@ export function useMap() {
                                 'Proposed',
                             ],
                             '#4f46e5',
-                            '#019603',
+                            '#000000',
                         ],
                         'circle-opacity': [
                             'match',
@@ -377,10 +465,8 @@ export function useMap() {
             map.moveLayer('Building', 'data-centers-circle-shadow');
             map.moveLayer('Building top', 'data-centers-circle-shadow');
             map.moveLayer('Other border', 'data-centers-circle-shadow');
-            map.moveLayer('water-basins-fill', 'Railway tunnel');
 
-            // Exclude Cancelled/Suspended from the start — don't rely on opacity
-            const ACTIVE_STATUSES = [
+            const ACTIVE_STATUSES_FILTER = [
                 'Operating',
                 'Expanding',
                 'Proposed',
@@ -389,43 +475,16 @@ export function useMap() {
             const baseFilter = [
                 'in',
                 ['get', 'status'],
-                ['literal', ACTIVE_STATUSES],
+                ['literal', ACTIVE_STATUSES_FILTER],
             ] as unknown as FilterSpecification;
             map.setFilter('data-centers-circle', baseFilter);
             map.setFilter('data-centers-circle-shadow', baseFilter);
 
-            map.on('idle', calculateVisibleMetrics);
-            map.on('moveend', calculateVisibleMetrics);
-
-            // Compute US-wide DC totals once after first idle (all tiles loaded)
-            map.once('idle', () => {
-                const features = map.querySourceFeatures('data-centers', {
-                    sourceLayer: 'data-centers',
-                });
-                const unique = new Map<string, string>();
-                features.forEach((f) => {
-                    const id = String(
-                        f.properties?.facility_id ??
-                            f.properties?.facility_name ??
-                            ''
-                    );
-                    if (id && !unique.has(id))
-                        unique.set(id, f.properties?.status ?? '');
-                });
-                let op = 0,
-                    pl = 0;
-                unique.forEach((status) => {
-                    if (['Operating', 'Expanding'].includes(status)) op++;
-                    else if (
-                        [
-                            'Proposed',
-                            'Approved/Permitted/Under construction',
-                        ].includes(status)
-                    )
-                        pl++;
-                });
-                setDcTotals({ operating: op, planned: pl });
-                setDcTotalsReady(true);
+            map.on('moveend', () => {
+                calculateVisibleMetrics();
+                boundsRef.current = map.getBounds();
+                zoomRef.current = map.getZoom();
+                computeRef.current();
             });
         });
 
@@ -453,7 +512,7 @@ export function useMap() {
                     : null;
             const rank =
                 p.size_rank != null && p.size_rank !== 'Unknown'
-                    ? String(p.size_rank).replace(/ \(.*\)$/, '') // strip MW range, e.g. "Hyperscale"
+                    ? String(p.size_rank).replace(/ \(.*\)$/, '')
                     : null;
             const details = [status, rank, mw].filter(Boolean).join(' · ');
 
@@ -473,11 +532,36 @@ export function useMap() {
             popup.remove();
         });
 
+        let roadsAboveWater = false;
+
+        map.on('zoom', () => {
+            const zoom = map.getZoom();
+
+            if (zoom >= 10 && !roadsAboveWater) {
+                map.moveLayer(
+                    'Road network outline',
+                    'data-centers-circle-shadow'
+                );
+                map.moveLayer('Road network', 'data-centers-circle-shadow');
+                roadsAboveWater = true;
+            } else if (zoom < 10 && roadsAboveWater) {
+                map.moveLayer('Road network outline', 'Pier');
+                map.moveLayer('Road network', 'Pier');
+                roadsAboveWater = false;
+            }
+        });
+
         return () => {
             map.remove();
             mapRef.current = null;
         };
     }, []);
+
+    // Keep filtersRef in sync + recompute on filter change
+    useEffect(() => {
+        filtersRef.current = filters;
+        computeRef.current();
+    }, [filters]);
 
     // Layer visibility
     useEffect(() => {
@@ -505,8 +589,7 @@ export function useMap() {
         if (!map || !map.isStyleLoaded()) return;
         if (!map.getLayer('data-centers-circle')) return;
 
-        // Base: only the four known active statuses — Cancelled/Suspended never pass
-        const ACTIVE_STATUSES = [
+        const ACTIVE_STATUSES_FILTER = [
             'Operating',
             'Expanding',
             'Proposed',
@@ -534,16 +617,15 @@ export function useMap() {
             filter = [
                 'in',
                 ['get', 'status'],
-                ['literal', ACTIVE_STATUSES],
+                ['literal', ACTIVE_STATUSES_FILTER],
             ] as unknown as FilterSpecification;
         }
 
         map.setFilter('data-centers-circle', filter);
         map.setFilter('data-centers-circle-shadow', filter);
-        map.fire('idle');
     }, [filters.status]);
 
-    // Water basin category filter + opacity — handled together so both always stay in sync
+    // Water basin category filter
     useEffect(() => {
         const map = mapRef.current;
         if (!map || !map.isStyleLoaded()) return;
@@ -551,7 +633,6 @@ export function useMap() {
 
         const selected = filters.waterCat;
 
-        // Arid (-1) is now selectable; only No Data (-9999) is always included when filtering
         const filter =
             selected.length > 0
                 ? ([
@@ -561,117 +642,7 @@ export function useMap() {
                   ] as unknown as FilterSpecification)
                 : null;
         map.setFilter('water-basins-fill', filter);
-
-        // Full opacity when filtering; zoom-based expression when showing all
-        const opacity =
-            selected.length > 0
-                ? [
-                      'interpolate',
-                      ['linear'],
-                      ['zoom'],
-                      5,
-                      1,
-                      10,
-                      0.7,
-                      13,
-                      0.65,
-                      15,
-                      0.45,
-                  ]
-                : [
-                      'interpolate',
-                      ['linear'],
-                      ['zoom'],
-                      5,
-                      1,
-                      10,
-                      0.7,
-                      13,
-                      0.65,
-                      15,
-                      0.45,
-                  ];
-        map.setPaintProperty('water-basins-fill', 'fill-opacity', opacity);
     }, [filters.waterCat]);
-
-    // Spatial DC count — split by operating/planned, for DCs inside selected water basins
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || filters.waterCat.length === 0) {
-            setFilteredDcCounts({ operating: 0, planned: 0 });
-            setFilteredDcCountsReady(true);
-            return;
-        }
-
-        // Mark as loading until the idle callback resolves
-        setFilteredDcCountsReady(false);
-
-        const compute = () => {
-            if (
-                !map.getLayer('data-centers-circle') ||
-                !map.getLayer('water-basins-fill')
-            )
-                return;
-
-            const ACTIVE = [
-                'Operating',
-                'Expanding',
-                'Proposed',
-                'Approved/Permitted/Under construction',
-            ];
-            const features = map.querySourceFeatures('data-centers', {
-                sourceLayer: 'data-centers',
-            });
-
-            // Deduplicate; store coords + status for both operating and planned
-            const unique = new Map<
-                string,
-                { coords: [number, number]; status: string }
-            >();
-            features.forEach((feat) => {
-                const status: string = feat.properties?.status ?? '';
-                if (!ACTIVE.includes(status)) return;
-                const id = String(
-                    feat.properties?.facility_id ??
-                        feat.properties?.facility_name ??
-                        ''
-                );
-                if (id && feat.geometry.type === 'Point' && !unique.has(id)) {
-                    unique.set(id, {
-                        coords: feat.geometry.coordinates as [number, number],
-                        status,
-                    });
-                }
-            });
-
-            let op = 0,
-                pl = 0;
-            unique.forEach(({ coords, status }) => {
-                try {
-                    const px = map.project(coords as maplibregl.LngLatLike);
-                    const hits = map.queryRenderedFeatures([px.x, px.y], {
-                        layers: ['water-basins-fill'],
-                    });
-                    if (hits.length > 0) {
-                        if (['Operating', 'Expanding'].includes(status)) op++;
-                        else pl++;
-                    }
-                } catch {
-                    /* off-screen */
-                }
-            });
-            setFilteredDcCounts({ operating: op, planned: pl });
-            setFilteredDcCountsReady(true);
-        };
-
-        console.log(map.getStyle().layers.map((l) => l.id));
-
-        // Wait for next idle so both the DC and water basin filters have rendered
-        map.once('idle', compute);
-        return () => {
-            map.off('idle', compute as Parameters<typeof map.off>[1]);
-        };
-    }, [filters.waterCat, filters.status]);
 
     return {
         containerRef,
@@ -680,9 +651,7 @@ export function useMap() {
         toggleLayer,
         filters,
         setFilters,
-        dcTotals,
-        dcTotalsReady,
-        filteredDcCounts,
-        filteredDcCountsReady,
+        dcMetrics,
+        dcMetricsReady,
     };
 }
