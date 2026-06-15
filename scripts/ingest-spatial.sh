@@ -7,7 +7,7 @@ set -euo pipefail
 
 # 1. Load the secure environment variables
 set -a
-source "$(dirname "$0")/../.env"
+source "$(dirname "$0")/../.env.local"
 set +a
 
 # 2. Build the secure connection string dynamically

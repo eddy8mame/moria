@@ -1,6 +1,6 @@
 'use client';
 
-import { Filters, DcTotals } from '@/app/hooks/useMap';
+import { Filters, DcMetrics } from '@/app/hooks/useMap';
 
 const STRESS_NAMES: Record<number, string> = {
     4: 'extremely high',
@@ -8,7 +8,6 @@ const STRESS_NAMES: Record<number, string> = {
     2: 'medium-high',
     1: 'low-medium',
     0: 'low',
-    [-1]: 'arid',
 };
 
 function joinList(items: string[]): string {
@@ -18,60 +17,59 @@ function joinList(items: string[]): string {
     return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 }
 
-function buildSentence(
-    filters: Filters,
-    dcTotals: DcTotals,
-    filteredDcCounts: DcTotals,
-): string {
+function buildBasinPhrase(waterCat: number[]): string {
+    const stressLevels = waterCat.filter((c) => c >= 0);
+    const hasArid = waterCat.includes(-1);
+    const stressNames = stressLevels.map((c) => STRESS_NAMES[c]).filter(Boolean);
+
+    if (hasArid && stressNames.length === 0) return 'arid and low-use basins';
+    if (!hasArid) return `${joinList(stressNames)} water stress basins`;
+    return `${joinList(stressNames)} water stress and arid basins`;
+}
+
+function buildSentence(filters: Filters, metrics: DcMetrics): string {
     const { status, waterCat } = filters;
+    const { operating, planned, pct, isViewport } = metrics;
     const hasWater = waterCat.length > 0;
 
-    // Resolve which counts to use
-    const opCount = hasWater ? filteredDcCounts.operating : dcTotals.operating;
-    const plCount = hasWater ? filteredDcCounts.planned : dcTotals.planned;
+    const opStr = operating.toLocaleString();
+    const plStr = planned.toLocaleString();
 
-    // Percentage — only shown when a water filter is active
-    let pct = '';
-    if (hasWater) {
-        let numerator: number;
-        let denominator: number;
-        if (status === null) {
-            numerator = filteredDcCounts.operating + filteredDcCounts.planned;
-            denominator = dcTotals.operating + dcTotals.planned;
-        } else if (status === 'Operating') {
-            numerator = filteredDcCounts.operating;
-            denominator = dcTotals.operating;
-        } else {
-            numerator = filteredDcCounts.planned;
-            denominator = dcTotals.planned;
-        }
-        if (denominator > 0) {
-            pct = ` (${Math.round((numerator / denominator) * 100)}%)`;
-        }
-    }
-
-    // Location phrase
-    let location = 'across the United States';
-    if (hasWater) {
-        const stressCats = waterCat.filter(c => c !== -9999);
-        const stressNames = stressCats.map(c => STRESS_NAMES[c]).filter(Boolean);
-        if (stressCats.length === 1 && stressCats[0] === -1) {
-            location = 'in arid areas of the United States';
-        } else {
-            location = `in ${joinList(stressNames)} water stress areas of the United States`;
-        }
-    }
-
+    // Count phrase
+    let countPhrase: string;
     if (status === null) {
-        return (
-            `There are ${opCount.toLocaleString()} operating and ` +
-            `${plCount.toLocaleString()} planned data centers${pct} ${location}.`
-        );
+        countPhrase = `${opStr} operating and ${plStr} planned data centers`;
+    } else if (status === 'Operating') {
+        countPhrase = `${opStr} operating data centers`;
+    } else {
+        countPhrase = `${plStr} planned data centers`;
     }
-    if (status === 'Operating') {
-        return `There are ${opCount.toLocaleString()} operating data centers${pct} ${location}.`;
+
+    // No water filter
+    if (!hasWater) {
+        const location = isViewport ? 'in this area' : 'in the United States';
+        return `There are ${countPhrase} ${location}.`;
     }
-    return `There are ${plCount.toLocaleString()} planned data centers${pct} ${location}.`;
+
+    // Water filter active
+    const basinPhrase = buildBasinPhrase(waterCat);
+
+    if (isViewport) {
+        return `${countPhrase} are located in ${basinPhrase} in this area.`;
+    }
+
+    // National + water + percentage
+    const denomLabel =
+        status === null
+            ? 'data centers'
+            : status === 'Operating'
+              ? 'operating data centers'
+              : 'planned data centers';
+
+    const pctClause =
+        pct !== null ? `, representing ${pct}% of ${denomLabel} in the United States` : '';
+
+    return `${countPhrase} are located in ${basinPhrase}${pctClause}.`;
 }
 
 function SkeletonPill() {
@@ -85,7 +83,7 @@ function SkeletonPill() {
             `}</style>
             <div style={{
                 height: '32px',
-                width: '460px', 
+                width: '460px',
                 borderRadius: '20px',
                 background: 'linear-gradient(90deg, #e2e8f0 25%, #cbd5e1 50%, #e2e8f0 65%)',
                 backgroundSize: '200% 100%',
@@ -97,20 +95,14 @@ function SkeletonPill() {
 
 export default function FilterSentence({
     filters,
-    dcTotals,
-    dcTotalsReady,
-    filteredDcCounts,
-    filteredDcCountsReady,
+    dcMetrics,
+    dcMetricsReady,
 }: {
     filters: Filters;
-    dcTotals: DcTotals;
-    dcTotalsReady: boolean;
-    filteredDcCounts: DcTotals;
-    filteredDcCountsReady: boolean;
+    dcMetrics: DcMetrics;
+    dcMetricsReady: boolean;
 }) {
-    const needsFilteredCounts = filters.waterCat.length > 0;
-    const loading = !dcTotalsReady || (needsFilteredCounts && !filteredDcCountsReady);
-    const text = loading ? null : buildSentence(filters, dcTotals, filteredDcCounts);
+    const text = dcMetricsReady ? buildSentence(filters, dcMetrics) : null;
 
     return (
         <div
@@ -122,7 +114,7 @@ export default function FilterSentence({
                 pointerEvents: 'none',
             }}
         >
-            {loading ? (
+            {!dcMetricsReady ? (
                 <SkeletonPill />
             ) : (
                 <div
