@@ -3,26 +3,55 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-const DATASETS = [
-    {
-        name: 'Aqueduct Water Risk Atlas',
-        source: 'World Resources Institute',
-        url: '#',
-        description:
-            'Placeholder — describe the dataset, its spatial resolution, the water stress metric methodology, and known limitations here.',
-    },
-    {
-        name: 'Data Center Database',
-        source: 'FracTracker Alliance',
-        url: '#',
-        description:
-            'Placeholder — describe the dataset, collection methodology, coverage, facility status definitions, and any known gaps or limitations here.',
-    },
-    // Add third dataset section here
-];
+// ── Dataset content ────────────────────────────────────────────────────────────
 
-function Modal({ onClose }: { onClose: () => void }) {
-    // Close on Escape key
+interface DatasetDef {
+    name: string;
+    source: string;
+    description: string;
+    links: { label: string; url: string }[];
+}
+
+const DATASETS = {
+    dataCenters: {
+        name: 'National Data Centers Tracker',
+        source: 'FracTracker Alliance',
+        description:
+            'Data center locations, statuses, and facility information are sourced from the FracTracker Alliance National Data Centers Tracker, a publicly available dataset compiled from FOIA requests, public records, media monitoring, and crowd-sourced submissions. The dataset focuses on the environmental and regulatory dimensions of U.S. data centers and is updated regularly. Facility completeness and attribute accuracy vary — capacity figures, operator names, and location confidence are not uniformly available across all records. If you are aware of a missing or incorrectly represented facility, you can submit a correction directly to FracTracker.',
+        links: [
+            {
+                label: 'Source',
+                url: 'https://www.fractracker.org/2025/07/national-data-centers-tracker/',
+            },
+            {
+                label: 'Submit a correction',
+                url: 'https://docs.google.com/forms/d/e/1FAIpQLSdxBfd_uyWfFLnhLjbJvDVwb6l_GNzvmLPD_9MIBWqq15Poyg/viewform',
+            },
+        ],
+    },
+    waterStress: {
+        name: 'Aqueduct Global Maps 4.0',
+        source: 'World Resources Institute',
+        description:
+            'Baseline water stress measures the ratio of total water demand to available renewable surface and groundwater supplies. Water demand includes domestic, industrial, irrigation, and livestock uses. Available renewable water supplies account for the impact of upstream consumptive users and large dams on downstream availability — higher values indicate greater competition among users. Water stress is represented at the hydrological basin level and should not be interpreted as a point measurement at any individual facility. Aqueduct is primarily a prioritization tool and should be augmented by local and regional analysis.',
+        links: [
+            {
+                label: 'Source',
+                url: 'https://doi.org/10.46830/writn.23.00061',
+            },
+            {
+                label: 'Dataset',
+                url: 'https://www.wri.org/data/aqueduct-global-maps-40-data',
+            },
+        ],
+    },
+} satisfies Record<string, DatasetDef>;
+
+export type DatasetKey = keyof typeof DATASETS;
+
+// ── Modal ──────────────────────────────────────────────────────────────────────
+
+function Modal({ dataset, onClose }: { dataset: DatasetDef; onClose: () => void }) {
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -67,30 +96,31 @@ function Modal({ onClose }: { onClose: () => void }) {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'flex-start',
-                        marginBottom: '20px',
+                        marginBottom: '16px',
                     }}
                 >
                     <div>
                         <h2
                             style={{
-                                margin: '0 0 2px',
+                                margin: '0 0 3px',
                                 fontSize: '15px',
                                 fontWeight: 700,
                                 color: '#0f172a',
                                 fontFamily: 'sans-serif',
                             }}
                         >
-                            Data Sources
+                            {dataset.name}
                         </h2>
                         <p
                             style={{
                                 margin: 0,
                                 fontSize: '11px',
                                 color: '#64748b',
+                                fontWeight: 600,
                                 fontFamily: 'sans-serif',
                             }}
                         >
-                            Attribution and dataset disclosures
+                            {dataset.source}
                         </p>
                     </div>
                     <button
@@ -116,51 +146,28 @@ function Modal({ onClose }: { onClose: () => void }) {
                     </button>
                 </div>
 
-                {/* Dataset sections */}
-                {DATASETS.map((ds, i) => (
-                    <div
-                        key={i}
-                        style={{
-                            paddingTop: i > 0 ? '18px' : 0,
-                            paddingBottom: i < DATASETS.length - 1 ? '18px' : 0,
-                            borderTop: i > 0 ? '1px solid #e2e8f0' : 'none',
-                        }}
-                    >
-                        <h3
-                            style={{
-                                margin: '0 0 2px',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                color: '#0f172a',
-                                fontFamily: 'sans-serif',
-                            }}
-                        >
-                            {ds.name}
-                        </h3>
-                        <p
-                            style={{
-                                margin: '0 0 10px',
-                                fontSize: '11px',
-                                color: '#64748b',
-                                fontWeight: 600,
-                                fontFamily: 'sans-serif',
-                            }}
-                        >
-                            {ds.source}
-                        </p>
-                        <p
-                            style={{
-                                margin: '0 0 10px',
-                                fontSize: '12px',
-                                color: '#334155',
-                                lineHeight: 1.65,
-                                fontFamily: 'sans-serif',
-                            }}
-                        >
-                            {ds.description}
-                        </p>
+                {/* Divider */}
+                <div style={{ borderTop: '1px solid #e2e8f0', marginBottom: '16px' }} />
+
+                {/* Description */}
+                <p
+                    style={{
+                        margin: '0 0 16px',
+                        fontSize: '12px',
+                        color: '#334155',
+                        lineHeight: 1.7,
+                        fontFamily: 'sans-serif',
+                    }}
+                >
+                    {dataset.description}
+                </p>
+
+                {/* Links */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {dataset.links.map((link) => (
                         <a
-                            href={ds.url}
+                            key={link.url}
+                            href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
@@ -169,21 +176,24 @@ function Modal({ onClose }: { onClose: () => void }) {
                                 textDecoration: 'none',
                                 fontWeight: 600,
                                 fontFamily: 'sans-serif',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
                             }}
                         >
-                            View source →
+                            {link.label} →
                         </a>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
     );
 }
 
-/** Self-contained info badge + attribution modal.
- *  Drop inside any `position: relative` container — the circle anchors to its
- *  bottom-right corner. */
-export function AttributionModal() {
+// ── Info badge + portal ────────────────────────────────────────────────────────
+
+/** Info circle anchored to bottom-right of its nearest `position: relative` container. */
+export function AttributionModal({ datasetKey }: { datasetKey: DatasetKey }) {
     const [isOpen, setIsOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -191,9 +201,10 @@ export function AttributionModal() {
         setMounted(true);
     }, []);
 
+    const dataset = DATASETS[datasetKey];
+
     return (
         <>
-            {/* Info circle — absolutely positioned at bottom-right of parent */}
             <button
                 onClick={(e) => {
                     e.stopPropagation();
@@ -235,10 +246,9 @@ export function AttributionModal() {
                 </span>
             </button>
 
-            {/* Modal portal */}
             {isOpen && mounted
                 ? createPortal(
-                      <Modal onClose={() => setIsOpen(false)} />,
+                      <Modal dataset={dataset} onClose={() => setIsOpen(false)} />,
                       document.body
                   )
                 : null}

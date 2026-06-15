@@ -6,7 +6,7 @@ import { DC_STATUSES, ALL_WATER_CHIPS } from './legend/constants';
 import { ServerIcon, DropIcon } from './legend/icons';
 import { LegendRow } from './legend/LegendRow';
 import { ChipRow, MultiChipRow } from './legend/ChipRow';
-import { AttributionModal } from './legend/AttributionModal';
+import { AttributionModal, DatasetKey } from './legend/AttributionModal';
 
 interface MapLegendProps {
     activeInfo: string | null;
@@ -41,7 +41,7 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
                 tooltip="Data Center Status"
                 expanded={dcExpanded}
                 onToggle={() => setDcExpanded((p) => !p)}
-                infoBadge={<AttributionModal />}
+                infoBadge={<AttributionModal datasetKey="dataCenters" />}
             >
                 <div style={{ padding: '0 8px 0 0' }}>
                     <ChipRow
@@ -59,7 +59,7 @@ export default function MapLegend({ filters, setFilters }: MapLegendProps) {
                 tooltip="Water Stress"
                 expanded={waterExpanded}
                 onToggle={() => setWaterExpanded((p) => !p)}
-                infoBadge={<AttributionModal />}
+                infoBadge={<AttributionModal datasetKey="waterStress" />}
             >
                 <div style={{ padding: '0 8px 0 0' }}>
                     <MultiChipRow
