@@ -2,12 +2,16 @@
 
 import { Filters, DcMetrics } from '@/app/hooks/useMap';
 
+// Severity order: Ext.High → High → Med-High → Low-Med → Low → Arid
+const CAT_SORT_ORDER = [4, 3, 2, 1, 0, -1];
+
 const STRESS_NAMES: Record<number, string> = {
     4: 'extremely high',
     3: 'high',
     2: 'medium-high',
     1: 'low-medium',
     0: 'low',
+    [-1]: 'arid and low-use',
 };
 
 function joinList(items: string[]): string {
@@ -18,58 +22,97 @@ function joinList(items: string[]): string {
 }
 
 function buildBasinPhrase(waterCat: number[]): string {
-    const stressLevels = waterCat.filter((c) => c >= 0);
-    const hasArid = waterCat.includes(-1);
-    const stressNames = stressLevels.map((c) => STRESS_NAMES[c]).filter(Boolean);
+    const sorted = [...waterCat].sort(
+        (a, b) => CAT_SORT_ORDER.indexOf(a) - CAT_SORT_ORDER.indexOf(b)
+    );
+    const stressCats = sorted.filter((c) => c >= 0);
+    const hasArid = sorted.includes(-1);
+    const stressNames = stressCats.map((c) => STRESS_NAMES[c]).filter(Boolean);
 
-    if (hasArid && stressNames.length === 0) return 'arid and low-use basins';
+    if (hasArid && stressNames.length === 0) return 'arid and low-use areas';
     if (!hasArid) return `${joinList(stressNames)} water stress basins`;
-    return `${joinList(stressNames)} water stress and arid basins`;
+    // Mixed: stress + arid — drop "basins" to avoid awkward "basins and areas"
+    return `${joinList(stressNames)} water stress and arid and low-use areas`;
+}
+
+/** Returns the count phrase ("X operating and Y planned"), dropping zeros.
+ *  Returns null when all relevant counts are zero. */
+function buildCountPhrase(
+    status: Filters['status'],
+    operating: number,
+    planned: number
+): string | null {
+    if (status === 'Operating') {
+        return operating > 0 ? `${operating.toLocaleString()} operating` : null;
+    }
+    if (status === 'Planned') {
+        return planned > 0 ? `${planned.toLocaleString()} planned` : null;
+    }
+    if (operating === 0 && planned === 0) return null;
+    if (operating === 0) return `${planned.toLocaleString()} planned`;
+    if (planned === 0) return `${operating.toLocaleString()} operating`;
+    return `${operating.toLocaleString()} operating and ${planned.toLocaleString()} planned`;
+}
+
+/** Builds percentage clause for viewport+water mode.
+ *  Omits a status if its count is zero or its national denominator was zero (pct=null). */
+function buildPctClause(
+    status: Filters['status'],
+    operating: number,
+    planned: number,
+    pctOp: number | null,
+    pctPl: number | null
+): string | null {
+    const parts: string[] = [];
+    if (status !== 'Planned' && operating > 0 && pctOp !== null) {
+        parts.push(`${pctOp}% of operating`);
+    }
+    if (status !== 'Operating' && planned > 0 && pctPl !== null) {
+        parts.push(`${pctPl}% of planned`);
+    }
+    if (parts.length === 0) return null;
+    return `representing ${joinList(parts)} data centers in those basins nationally`;
 }
 
 function buildSentence(filters: Filters, metrics: DcMetrics): string {
     const { status, waterCat } = filters;
-    const { operating, planned, pct, isViewport } = metrics;
+    const { operating, planned, pctOp, pctPl, isViewport } = metrics;
     const hasWater = waterCat.length > 0;
+    const location = isViewport ? 'in this area' : 'in the United States';
 
-    const opStr = operating.toLocaleString();
-    const plStr = planned.toLocaleString();
+    const zeroLabel =
+        status === 'Operating'
+            ? 'no operating data centers'
+            : status === 'Planned'
+              ? 'no planned data centers'
+              : 'no data centers';
 
-    // Count phrase
-    let countPhrase: string;
-    if (status === null) {
-        countPhrase = `${opStr} operating and ${plStr} planned data centers`;
-    } else if (status === 'Operating') {
-        countPhrase = `${opStr} operating data centers`;
-    } else {
-        countPhrase = `${plStr} planned data centers`;
-    }
+    const countPhrase = buildCountPhrase(status, operating, planned);
 
     // No water filter
     if (!hasWater) {
-        const location = isViewport ? 'in this area' : 'in the United States';
-        return `There are ${countPhrase} ${location}.`;
+        if (!countPhrase) return `There are ${zeroLabel} ${location}.`;
+        return `There are ${countPhrase} data centers ${location}.`;
     }
 
     // Water filter active
     const basinPhrase = buildBasinPhrase(waterCat);
 
-    if (isViewport) {
-        return `${countPhrase} are located in ${basinPhrase} in this area.`;
+    if (!countPhrase) {
+        return `There are ${zeroLabel} in ${basinPhrase} ${location}.`;
     }
 
-    // National + water + percentage
-    const denomLabel =
-        status === null
-            ? 'data centers'
-            : status === 'Operating'
-              ? 'operating data centers'
-              : 'planned data centers';
+    if (!isViewport) {
+        // National + water: counts only, no percentage
+        return `There are ${countPhrase} data centers in ${basinPhrase} in the United States.`;
+    }
 
-    const pctClause =
-        pct !== null ? `, representing ${pct}% of ${denomLabel} in the United States` : '';
-
-    return `${countPhrase} are located in ${basinPhrase}${pctClause}.`;
+    // Viewport + water: append percentage clause if available
+    const pctClause = buildPctClause(status, operating, planned, pctOp, pctPl);
+    if (pctClause) {
+        return `There are ${countPhrase} data centers in ${basinPhrase} in this area, ${pctClause}.`;
+    }
+    return `There are ${countPhrase} data centers in ${basinPhrase} in this area.`;
 }
 
 function SkeletonPill() {
