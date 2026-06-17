@@ -38,6 +38,7 @@ export function LegendRow({
     return (
         <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
+                {!expanded && infoBadge}
                 {badgeHovered && (
                     <div ref={badgeTooltipRef} style={{
                         position: 'absolute',
@@ -71,7 +72,6 @@ export function LegendRow({
                         }} />
                     </div>
                 )}
-                {infoBadge}
                 <button
                     onClick={onToggle}
                     onMouseEnter={() => setBadgeHovered(true)}
@@ -97,8 +97,9 @@ export function LegendRow({
                 </button>
             </div>
             {expanded && (
-                <div style={{ marginLeft: '-1px' }}>
+                <div style={{ position: 'relative', marginLeft: '-1px' }}>
                     {children}
+                    {infoBadge}
                 </div>
             )}
         </div>
